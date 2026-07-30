@@ -23,7 +23,7 @@ This document explains the configuration options, the default values, and sensib
 
 ## Stage: `RunHailFiltering`
   * Config Section: `RunHailFiltering`
-  * Description: Controls filtering thresholds and de novo variant detection parameters during the Hail Stage
+  * Description: Controls filtering thresholds and de novo variant detection parameters during the native filtering stage
 
 | Field                     | Purpose                                                                                                                                                                                                                                                    | Default                                                                       | Alternative                                                                                       |
 |---------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------|
@@ -35,7 +35,7 @@ This document explains the configuration options, the default values, and sensib
 | `am_pathogenicity`        | A float, defining the minimum AlphaMissense pathogenicity score to be treated as pathogenic. Replaces deference to AlphaMissense's default am_class value, which is using the 0.564 score as a Likely Pathogenic threshold                                 | 0.564                                                                         |                                                                                                   |
 
   * Config Section: `RunHailFiltering.de_novo`
-  * Description: Controls filtering thresholds and de novo variant detection parameters during the Hail Stage
+  * Description: Controls filtering thresholds and de novo variant detection parameters during the native filtering stage
 
 | Field                | Purpose                                                                                                                                                         | Default | Alternative |
 |----------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|-------------|

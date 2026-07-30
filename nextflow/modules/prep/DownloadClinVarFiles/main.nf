@@ -1,5 +1,5 @@
 process DownloadClinVarFiles {
-    container params.container
+    memory 2.GB
 
     errorStrategy {'retry'}
     maxRetries 3

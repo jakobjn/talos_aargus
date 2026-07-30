@@ -19,6 +19,9 @@ nextflow.enable.dsl=2
 include { ANNOTATION } from './nextflow/annotation'
 include { TALOS } from './nextflow/talos'
 
+def processedAnnotationPath(String name) {
+    return file("${params.processed_annotations}/${name}")
+}
 
 workflow {
 	main:
@@ -27,7 +30,9 @@ workflow {
 		exit 1
     }
 
-	if (!file(params.mane_json).exists()) {
+	def mane_json = processedAnnotationPath('mane.json')
+
+	if (!mane_json.exists()) {
 		println "MANE JSON not available, please run the Talos Prep workflow (--entry preparation)"
 		exit 1
 	}
@@ -44,7 +49,7 @@ workflow {
 
 	ch_gff = channel.fromPath(params.ensembl_gff, checkIfExists: true).first()
 	ch_ref_genome = channel.fromPath(params.ref_genome, checkIfExists: true).first()
-	ch_mane = channel.fromPath(params.mane_json, checkIfExists: true).first()
+	ch_mane = channel.fromPath(mane_json, checkIfExists: true).first()
 
 	ch_inputs = channel.fromPath(params.input_tsv)
 		.splitCsv(header: true, sep: '\t')
@@ -71,9 +76,9 @@ workflow {
 		ch_inputs,
 	)
 
-	ch_talos_combined = ANNOTATION.out.mts
+	ch_talos_combined = ANNOTATION.out.vcfs
 		.join(ch_talos_inputs)
-		.map { cohort, mts, _inpath, _intype, pedigree, config, history, ext, seqr, mito -> tuple(cohort, mts, pedigree, config, history, ext, seqr, mito) }
+		.map { cohort, vcfs, _inpath, _intype, pedigree, config, history, ext, seqr, mito -> tuple(cohort, vcfs, pedigree, config, history, ext, seqr, mito) }
 
 	TALOS(
 		ch_mane,
@@ -83,7 +88,7 @@ workflow {
 	)
 
 	publish:
-		mts = ANNOTATION.out.mts
+		vcfs = ANNOTATION.out.vcfs
     	html = TALOS.out.html
 		json = TALOS.out.json
 		labelled = TALOS.out.labelled
@@ -91,8 +96,8 @@ workflow {
 }
 
 output {
-	mts {
-		path { id, _mts -> "${id}_outputs" }
+	vcfs {
+		path { id, _vcfs -> "${id}_outputs" }
 	}
 	html {
 		path { id, _html -> "${id}_outputs" }

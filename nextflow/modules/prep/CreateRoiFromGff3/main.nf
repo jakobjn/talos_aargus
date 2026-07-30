@@ -1,5 +1,6 @@
 process CreateRoiFromGff3 {
-    container params.container
+    memory 2.GB
+    cpus 1
 
     // this file is not downloaded at runtime - that presents issues for offline execution environments
     input:
@@ -17,6 +18,7 @@ process CreateRoiFromGff3 {
     script:
         """
         set -euo pipefail
+        export PYTHONPATH="${projectDir}/src:\$PYTHONPATH"
 
         python -m talos.annotation_scripts.create_roi_from_gff3 \
             --gff3 ${gff} \

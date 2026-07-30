@@ -1,5 +1,4 @@
 process EncodeNapogee {
-    container params.container
 
     input:
         path tsv
@@ -10,11 +9,12 @@ process EncodeNapogee {
     script:
         """
         set -euo pipefail
+        export PYTHONPATH="${projectDir}/src:\$PYTHONPATH"
 
         python -m talos.annotation_scripts.parse_napogee \
             --input ${tsv} \
             --output napogee.vcf.gz
 
-        echtvar encode napogee.zip /talos/echtvar/napogee_config.json napogee.vcf.gz
+        echtvar encode napogee.zip ${projectDir}/echtvar/napogee_config.json napogee.vcf.gz
         """
 }

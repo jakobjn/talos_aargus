@@ -10,12 +10,16 @@ include { HPOFlagging } from './modules/talos/HPOFlagging/main'
 include { CreateTalosHTML } from './modules/talos/CreateTalosHTML/main'
 include { StartupChecks } from './modules/talos/StartupChecks/main'
 
+def processedAnnotationPath(String name) {
+    return file("${params.processed_annotations}/${name}")
+}
+
 workflow TALOS {
 	take:
 		ch_mane
 		ch_gff
 		ch_ref_genome
-		ch_mts
+		ch_vcfs
 
     main:
     // existence of these files is necessary for starting the workflow
@@ -29,8 +33,8 @@ workflow TALOS {
     def timestamp = new java.util.Date().format('yyyy-MM-dd')
 
     // check if clinvar and panelapp data exist using the timestamp
-    String current_clinvarbitration_all = "${params.processed_annotations}/clinvarbitration_${current_month}.ht"
-    String current_clinvarbitration_pm5 = "${params.processed_annotations}/clinvarbitration_${current_month}.pm5.ht"
+    String current_clinvarbitration_all = "${params.processed_annotations}/clinvarbitration_${current_month}.vcf.bgz"
+    String current_clinvarbitration_pm5 = "${params.processed_annotations}/clinvarbitration_${current_month}.pm5.tsv"
 
     if (!file(current_clinvarbitration_pm5).exists()) {
         println "ClinvArbitration data for this month (${current_clinvarbitration_pm5}) doesn't exist, run the Talos Prep workflow"
@@ -39,7 +43,9 @@ workflow TALOS {
 
     // read in each Clinvar input source as channel
     ch_clinvar_all = channel.fromPath(current_clinvarbitration_all, checkIfExists: true).first()
+    ch_clinvar_all_tbi = channel.fromPath("${current_clinvarbitration_all}.tbi", checkIfExists: true).first()
     ch_clinvar_pm5 = channel.fromPath(current_clinvarbitration_pm5, checkIfExists: true).first()
+    ch_bed = channel.fromPath(processedAnnotationPath('GRCh38.bed'), checkIfExists: true).first()
 
     String panelapp_path = "${params.processed_annotations}/panelapp_${current_month}.json"
 
@@ -51,14 +57,14 @@ workflow TALOS {
 
     // run pre-Talos startup checks
     StartupChecks(
-        ch_mts,
+        ch_vcfs,
         ch_clinvar_all,
     )
 
     // UnifiedPanelAppParser
     ch_panel_app_inputs = StartupChecks.out
-        .join(ch_mts)
-        .map { cohort, check_file, _mts, pedigree, config, _history, _ext, _seqr, _mito ->
+        .join(ch_vcfs)
+        .map { cohort, check_file, _vcfs, pedigree, config, _history, _ext, _seqr, _mito ->
             tuple(cohort, check_file, config, pedigree)
         }
 
@@ -68,24 +74,27 @@ workflow TALOS {
     	ch_hpo_file,
     )
 
-    ch_run_hail_inputs = ch_mts
+    ch_run_hail_inputs = ch_vcfs
         .join(UnifiedPanelAppParser.out)
         .join(StartupChecks.out)
-        .map { cohort, mts, pedigree, config, _history, _ext, _seqr, _mito, panelapp_data, check_file ->
-            tuple(cohort, mts, panelapp_data, check_file, pedigree, config)
+        .map { cohort, vcfs, pedigree, config, _history, _ext, _seqr, _mito, panelapp_data, check_file ->
+            tuple(cohort, vcfs, panelapp_data, check_file, pedigree, config)
         }
 
     RunHailFiltering(
         ch_run_hail_inputs,
         ch_clinvar_all,
+        ch_clinvar_all_tbi,
         ch_clinvar_pm5,
+        ch_bed,
+        ch_mane,
     )
 
     // surprise! It's Mito data!
-    ch_mito_joined = ch_mts
+    ch_mito_joined = ch_vcfs
         .join(UnifiedPanelAppParser.out)
         .join(StartupChecks.out)
-        .map { cohort, _mts, pedigree, config, _history, _ext, _seqr, mito, panelapp_data, check_file ->
+        .map { cohort, _vcfs, pedigree, config, _history, _ext, _seqr, mito, panelapp_data, check_file ->
           tuple(cohort, mito, panelapp_data, pedigree, config)
     }
 
@@ -97,9 +106,9 @@ workflow TALOS {
     ch_mito_for_annotation = ch_mito_branched.real
         .map { cohort, mito, panelapp, ped, config ->
             tuple(cohort, mito, panelapp, ped, config,
-                  file(params.mitimpact_zip, checkIfExists: true),
-                  file(params.mitotip_zip, checkIfExists: true),
-                  file(params.napogee_zip, checkIfExists: true))
+                  file(processedAnnotationPath('mitimpact.zip'), checkIfExists: true),
+                  file(processedAnnotationPath('mitotip.zip'), checkIfExists: true),
+                  file(processedAnnotationPath('napogee.zip'), checkIfExists: true))
         }
 
     AnnotateMitoVcf(
@@ -107,6 +116,7 @@ workflow TALOS {
         ch_ref_genome,
         ch_gff,
         ch_clinvar_all,
+        ch_clinvar_all_tbi,
     )
 
     ch_mito_resolved = AnnotateMitoVcf.out
@@ -115,9 +125,9 @@ workflow TALOS {
     // Validate MOI of all variants
     ch_validate_moi_inputs = RunHailFiltering.out
         .join(UnifiedPanelAppParser.out)
-        .join(ch_mts)
+        .join(ch_vcfs)
         .join(ch_mito_resolved)
-        .map { cohort, labelled_vcf, labelled_vcf_index, panelapp_out, _mts, pedigree, config, history, _ext, _seqr, _mito, anno_mito ->
+        .map { cohort, labelled_vcf, labelled_vcf_index, panelapp_out, _vcfs, pedigree, config, history, _ext, _seqr, _mito, anno_mito ->
             tuple(cohort, labelled_vcf, labelled_vcf_index, anno_mito, panelapp_out, pedigree, config, history)
         }
 
@@ -128,8 +138,8 @@ workflow TALOS {
 
     // Flag any relevant HPO terms
     ch_hpo_inputs = ValidateMOI.out
-        .join(ch_mts)
-        .map { cohort, talos_result_json, _mts, _pedigree, config, _history, _ext, _seqr, _mito ->
+        .join(ch_vcfs)
+        .map { cohort, talos_result_json, _vcfs, _pedigree, config, _history, _ext, _seqr, _mito ->
             tuple(cohort, talos_result_json, config)
         }
 
@@ -144,8 +154,8 @@ workflow TALOS {
     // Generate HTML report
     ch_create_html_inputs = HPOFlagging.out
         .join(UnifiedPanelAppParser.out)
-        .join(ch_mts)
-        .map { cohort, result_json, panelapp_data, _mts, _pedigree, config, _history, ext, seqr, _mito ->
+        .join(ch_vcfs)
+        .map { cohort, result_json, panelapp_data, _vcfs, _pedigree, config, _history, ext, seqr, _mito ->
             tuple(cohort, result_json, panelapp_data, config, ext, seqr)
         }
 

@@ -1,5 +1,4 @@
 process DownloadPanelApp {
-    container params.container
 
     input:
         path mane
@@ -11,6 +10,7 @@ process DownloadPanelApp {
     script:
         """
         set -euo pipefail
+        export PYTHONPATH="${projectDir}/src:\$PYTHONPATH"
 
         python -m talos.download_panelapp \
             --output panelapp_${timestamp}.json \

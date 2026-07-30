@@ -1,5 +1,6 @@
 process SplitVcf {
-    container params.container
+    memory 2.GB
+    cpus 1
 
     input:
         tuple val(cohort), path(vcf)

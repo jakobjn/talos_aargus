@@ -5,9 +5,9 @@ This workflow takes ownership over all the input data preparation steps across b
 
 The data prepared in this workflow is:
 
-- AlphaMissense data, reformatted into a HailTable
+- AlphaMissense data, reformatted into an echtvar archive
 - PanelApp data, freshly downloaded
-- ClinVar data, freshly downloaded and reformatted into Hail Tables
+- ClinVar data, freshly downloaded and reformatted into a VCF plus PM5 TSV
 - Mane data, downloaded and reformatted
 - BED file representing ROI for all Ensembl genes
 */
@@ -70,11 +70,16 @@ workflow {
     }
 
     // does this month's clinvarbitration data exist?
-    String current_clinvarbitration_all = "${params.processed_annotations}/clinvarbitration_${timestamp}.ht"
-    String current_clinvarbitration_pm5 = "${params.processed_annotations}/clinvarbitration_${timestamp}.pm5.ht"
+    String current_clinvarbitration_all = "${params.processed_annotations}/clinvarbitration_${timestamp}.vcf.bgz"
+    String current_clinvarbitration_pm5 = "${params.processed_annotations}/clinvarbitration_${timestamp}.pm5.tsv"
 
     if (file(current_clinvarbitration_pm5).exists()) {
-        ch_clinvar_all = channel.fromPath(current_clinvarbitration_all)
+        ch_clinvar_all = channel.of(
+            tuple(
+                file(current_clinvarbitration_all, checkIfExists: true),
+                file("${current_clinvarbitration_all}.tbi", checkIfExists: true),
+            ),
+        )
         ch_clinvar_pm5 = channel.fromPath(current_clinvarbitration_pm5)
     } else {
         // new workflow elements to go and create it from raw data
@@ -114,7 +119,7 @@ workflow {
             timestamp,
         )
 
-        ch_clinvar_all = ResummariseRawSubmissions.out.ht
+        ch_clinvar_all = ResummariseRawSubmissions.out.vcf
         ch_clinvar_pm5 = MakeClinvarbitrationPm5.out
     }
 
@@ -132,7 +137,7 @@ workflow {
         ch_symbol_lookup = channel.fromPath(params.ensembl_symbol_lookup, checkIfExists: true)
     }
 
-    // pull and parse the MANE data into a Hail Table
+    // pull and parse the MANE data into JSON for downstream annotation
     if (!file(params.mane_json).exists()) {
         ch_mane_summary = channel.fromPath(params.mane, checkIfExists: true)
         ParseManeIntoJson(ch_mane_summary)

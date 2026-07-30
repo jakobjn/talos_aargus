@@ -1,0 +1,4 @@
+sample_id	vcf_path
+PROBAND	/path/to/PROBAND.vcf.gz
+FATHER	/path/to/FATHER.vcf.gz
+MOTHER	/path/to/MOTHER.vcf.gz

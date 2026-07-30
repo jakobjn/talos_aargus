@@ -859,7 +859,14 @@ def extract_csq(csq_contents: str) -> list[dict]:
     csq_categories = config_retrieve(['RunHailFiltering', 'csq_string'])
 
     # iterate over all consequences, and make each into a dict
-    txc_dicts = [dict(zip(csq_categories, each_csq.split('|'), strict=True)) for each_csq in csq_contents.split(',')]
+    txc_dicts = []
+    for each_csq in csq_contents.split(','):
+        values = each_csq.split('|')
+        if len(values) < len(csq_categories):
+            values.extend([''] * (len(csq_categories) - len(values)))
+        elif len(values) > len(csq_categories):
+            values = values[: len(csq_categories)]
+        txc_dicts.append(dict(zip(csq_categories, values, strict=False)))
 
     # update this String to be either a float, or missing
     for each_dict in txc_dicts:

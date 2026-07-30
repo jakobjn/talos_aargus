@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-Reformat the MANE summary file into a Hail Table
+Reformat the MANE summary file into JSON or, for legacy paths, a Hail Table.
 https://ftp.ncbi.nlm.nih.gov/refseq/MANE/README.txt
 """
 
@@ -10,9 +10,6 @@ import json
 from argparse import ArgumentParser
 from collections import defaultdict
 from csv import DictReader
-
-import hail as hl
-
 
 def mane_to_json(input_path: str, output_path: str):
     """
@@ -45,7 +42,7 @@ def mane_to_json(input_path: str, output_path: str):
 
 def mane_to_ht(input_path: str, output_path: str):
     """
-    Reformat the MANE summary file into a Hail Table
+    Legacy helper retained for older Hail-based paths.
     """
 
     temp_tsv = 'temp.tsv'

@@ -1,4 +1,9 @@
 """
+Legacy Hail-based structural-variant filtering path.
+
+The default public Talos workflow does not use this module. It is retained for
+older or internal deployments that still depend on Hail-backed SV inputs.
+
 A Hail filtering process for labelling analysis-relevant SVs
 Initially this will only contain a single category
 This expects data annotated by GATK's SVAnnotate tool

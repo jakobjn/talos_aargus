@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
 """
-Takes the annotated VCF, samples and all, and reads it as a MatrixTable.
-This rearranges all the annotations into the format expected downstream.
+Legacy Hail-era converter from annotated VCF to MatrixTable.
+
+The default public Talos workflow now passes annotated VCFs directly into the
+native filtering path and does not use this module.
 """
 
 import json
@@ -54,7 +56,7 @@ def csq_strings_into_hail_structs(csq_strings: list[str], mt: hl.MatrixTable) ->
     """
 
     # get the BCSQ contents as a list of lists of strings, per variant
-    split_csqs = mt.info.BCSQ.map(lambda csq_entry: csq_entry.split('\|'))  # noqa: W605
+    split_csqs = mt.info.BCSQ.map(lambda csq_entry: csq_entry.split('\\|'))
 
     # this looks pretty hideous, bear with me
     # if BCFtools csq doesn't have a consequence annotation, it will truncate the pipe-delimited string

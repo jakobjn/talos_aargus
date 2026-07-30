@@ -1,7 +1,7 @@
-# Script for gathering large inputs required by Talos
-# This runs a download from multiple different sources
-# Output file names created/expected by this script match the initial configuration file content in `talos.config` and `annotation.config`
-set -o pipefail
+#!/usr/bin/env bash
+# Script for gathering large inputs required by Talos.
+# Output file names created/expected by this script match the defaults in `nextflow.config`.
+set -euo pipefail
 
 TMX=$(command -v tmux)
 POLL_INTERVAL=1
@@ -9,12 +9,22 @@ SESSION_NAME="download_manager"
 WINDOW_NAME="Downloads"
 TMX_WINDOW_ID=""
 declare -a DOWNLOAD_TARGETS=()
+declare -i DOWNLOAD_FAILURES=0
+DISABLE_TMUX="${TALOS_DISABLE_TMUX:-0}"
 
-if [ ! -z "$TMX" ] && [ -z "$TMUX" ]; then
-  # tmux installed, but not in a tmux session. restart in tmux.
-  tmux new-session -d -s "$SESSION_NAME" sh "$0" "$@"
-  tmux attach-session -t "$SESSION_NAME"
-  exit 0
+if [ -n "${SLURM_JOB_ID:-}" ]; then
+  DISABLE_TMUX=1
+fi
+
+if [ "$DISABLE_TMUX" != "1" ] && [ -n "$TMX" ] && [ -z "${TMUX:-}" ]; then
+  # tmux installed, but not in a tmux session. Restart in tmux using bash, not sh.
+  # If tmux startup fails, continue in the current shell instead of exiting immediately.
+  if tmux new-session -d -s "$SESSION_NAME" bash "$0" "$@"; then
+    tmux attach-session -t "$SESSION_NAME"
+    exit 0
+  fi
+  echo "[WARN] Failed to start tmux session; continuing in the current shell."
+  TMX=""
 fi
 
 cleanup() {
@@ -22,11 +32,11 @@ cleanup() {
   CURRENT_PGID=$(ps -o pgid= -p $$ | tr -d '[:space:]')
   pkill -SIGTERM -g "$CURRENT_PGID" -f curl
 
-  if [ -z $TMX ]; then
-	wait
+  if [ -z "${TMX:-}" ]; then
+	wait || true
   else
     # Kill the tmux window we created for the downloads
-    if $TMX list-windows | grep -q "$WINDOW_NAME"; then
+    if "$TMX" list-windows | grep -q "$WINDOW_NAME"; then
       $TMX kill-window -t "$TMX_WINDOW_ID"
     fi
   fi
@@ -36,8 +46,8 @@ cleanup() {
 
 start_download() {
   local url="$1"
-  local output="$2"
-  local banner="$3"
+  local output="${2:-}"
+  local banner="${3:-}"
 
   if [ -z "$output" ]; then
     output=$(basename "$url")
@@ -64,8 +74,8 @@ start_download() {
   # On success (exit 0) we atomically mv into place.
   # NOTE: All internal $ variables are escaped (\$) so they are evaluated when the command runs, not now.
   local script_name="$(basename "$0")"
-  local cmd="echo \"$banner\"; echo; curl -C - -# -L --fail -o \"$part_file\" \"$url\" && mv -f \"$part_file\" \"$final\" || { rc=\$?; if [ \"\$rc\" -ne 0 ]; then echo \"[WARN] $final Download failed for (exit \\${rc}). Restart ${script_name} to gracefully resume download.\"; fi; }"
-  if [ -z $TMX ]; then
+  local cmd="echo \"$banner\"; echo; curl -C - -# -L --fail -o \"$part_file\" \"$url\" && mv -f \"$part_file\" \"$final\" || { rc=\$?; if [ \"\$rc\" -ne 0 ]; then echo \"[WARN] $final Download failed for (exit \${rc}). Restart ${script_name} to gracefully resume download.\"; fi; }"
+  if [ -z "${TMX:-}" ] || [ "$DISABLE_TMUX" = "1" ]; then
      ( eval "$cmd" ) &
   else
     echo "[JOB START] Starting download for: $url to $output."
@@ -79,8 +89,17 @@ start_download() {
 }
 
 await() {
-  if [ -z $TMX ]; then
-    wait
+  if [ -z "${TMX:-}" ] || [ "$DISABLE_TMUX" = "1" ]; then
+    local pid
+    local rc
+    for pid in $(jobs -p); do
+      if ! wait "$pid"; then
+        rc=$?
+        DOWNLOAD_FAILURES+=1
+        echo "[WARN] Background download job ${pid} failed (exit ${rc})."
+      fi
+    done
+    return 0
   else
     # No downloads were started in tmux — nothing to wait on.
     if [ -z "$TMX_WINDOW_ID" ]; then
@@ -89,11 +108,11 @@ await() {
   last_pane_count=-1
     while true; do
       pane_count=$($TMX list-panes -t "$TMX_WINDOW_ID" 2>/dev/null | wc -l)
-      if [ $last_pane_count != $pane_count ]; then
+      if [ "$last_pane_count" != "$pane_count" ]; then
         $TMX select-layout -t "$TMX_WINDOW_ID" even-vertical
         last_pane_count=$pane_count
       fi
-      if [ $pane_count == 0 ]; then
+      if [ "$pane_count" = 0 ]; then
         break;
       fi
       sleep "$POLL_INTERVAL"
@@ -102,6 +121,13 @@ await() {
 }
 
 trap cleanup SIGINT SIGTERM
+
+for required_cmd in curl gunzip gzip sed date; do
+  if ! command -v "$required_cmd" >/dev/null 2>&1; then
+    echo "[ERROR] Missing required command: $required_cmd"
+    exit 1
+  fi
+done
 
 # Echtvar-encoded gnomAD 4.1 population frequencies - this is a big one (~6GB) so it's started early and backgrounded
 ECHTVAR_FILE="gnomad_4.1_region_merged_GRCh38_whole_genome"
@@ -182,6 +208,15 @@ if [ ! -f "${GFF3_chrM_RENAMED}" ] && [ -f "${GFF3_ORIGINAL}" ]; then
     gunzip -c "${GFF3_ORIGINAL}" | sed 's/^MT/M/' | gzip > "${GFF3_chrM_RENAMED}"
 fi
 
+if [ -f "${GRCh38_decompressed}" ] && [ ! -f "${GRCh38_decompressed}.fai" ]; then
+  if command -v samtools >/dev/null 2>&1; then
+    echo "Indexing reference Fasta with samtools faidx"
+    samtools faidx "${GRCh38_decompressed}"
+  else
+    echo "[WARN] samtools not found; skipping ${GRCh38_decompressed}.fai generation"
+  fi
+fi
+
 # Final status summary
 summary_fail=0
 script_name_summary="$(basename "$0")"
@@ -196,4 +231,8 @@ if [ $summary_fail -eq 0 ]; then
   echo "[SUCCESS] All ${#DOWNLOAD_TARGETS[@]} downloads completed successfully."
 else
   echo "[SUMMARY] $summary_fail of ${#DOWNLOAD_TARGETS[@]} downloads missing. Restart ${script_name_summary} to gracefully resume."
+fi
+
+if [ $DOWNLOAD_FAILURES -gt 0 ]; then
+  echo "[SUMMARY] ${DOWNLOAD_FAILURES} background download job(s) returned a non-zero exit code."
 fi

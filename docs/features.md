@@ -1,6 +1,6 @@
 # Features
 
-Talos prioritises variants using a small set of rule-based **logic modules**, each aligned with specific ACMG/AMP evidence criteria. These modules are each present in code, implemented in Hail Query, and some can be modified by altering thresholds in configuration files. This page outlines the modules and the workflow features built on top of them.
+Talos prioritises variants using a small set of rule-based **logic modules**, each aligned with specific ACMG/AMP evidence criteria. These modules are present in code and can be modified by altering thresholds in configuration files. This page outlines the modules and the workflow features built on top of them.
 
 ---
 
@@ -75,7 +75,7 @@ Talos produces structured outputs to support both manual review and downstream i
 
 - A `*.json` file listing all candidate variants for each proband.
 - Includes variant-level and gene-level evidence, inheritance checks, and phenotype match tags.
-- One or more MatrixTables representing the annotated and reformatted input data. These are the starting point for subsequent runs of the workflow, skipping the annotation process.
+- One or more annotated VCF shards representing the preprocessed dataset. These are the starting point for subsequent runs of the workflow when annotation is being skipped.
 
 ### Optional outputs
 

@@ -1,5 +1,5 @@
 process EncodeAlphaMissense {
-    container params.container
+    memory 16.GB
 
     input:
         path tsv
@@ -10,11 +10,12 @@ process EncodeAlphaMissense {
     script:
         """
         set -euo pipefail
+        export PYTHONPATH="${projectDir}/src:\$PYTHONPATH"
 
         python -m talos.annotation_scripts.parse_alphamissense \
             --input ${tsv} \
             --output alphamissense.vcf.gz
 
-        echtvar encode alphamissense.zip /talos/echtvar/am_config.json alphamissense.vcf.gz
+        echtvar encode alphamissense.zip ${projectDir}/echtvar/am_config.json alphamissense.vcf.gz
         """
 }

@@ -1,5 +1,4 @@
 process UnifiedPanelAppParser {
-    container params.container
 
     input:
         tuple val(cohort), path(check_file), path(talos_config), path(pedigree)
@@ -13,6 +12,7 @@ process UnifiedPanelAppParser {
         """
         set -euo pipefail
 
+        export PYTHONPATH="${projectDir}/src:\$PYTHONPATH"
         export TALOS_CONFIG=${talos_config}
         python -m talos.unified_panelapp_parser \
             --input $panelapp_cache \

@@ -1,5 +1,6 @@
 process AnnotateCsqWithBcftools {
-    container params.container
+    memory 1.GB
+    cpus 1
 
     input:
         tuple val(cohort), path(vcf), path(vcf_tbi)

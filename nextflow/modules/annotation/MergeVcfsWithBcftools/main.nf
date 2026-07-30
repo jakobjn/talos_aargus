@@ -1,5 +1,4 @@
 process MergeVcfsWithBcftools {
-    container params.container
 
     input:
         tuple val(cohort), path(vcfs), path(tbis)

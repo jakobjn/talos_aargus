@@ -34,7 +34,7 @@
         "container": {
           "type": "string",
           "default": "talos:11.1.0",
-          "description": "Docker container used by processes."
+          "description": "Optional container image used by processes when running with a container-enabled profile."
         },
         "mane": {
           "type": "string",

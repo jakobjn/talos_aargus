@@ -99,6 +99,13 @@ dmypy.json
 nextflow/*test/
 nextflow/processed_annotations/
 work/
+preflight/.nextflow/
+preflight/.nextflow.log*
+preflight/work/
+preflight/results/
+nextflow_test_output/
+nextflow_test_output_apptainer/
+.nextflow-apptainer/
 
 # mkdocs
 site/
@@ -106,3 +113,35 @@ site/
 # Added by code-review-graph
 .code-review-graph/
 CLAUDE.md
+
+# local Codex / shell state
+.cdx
+.cmd
+.codex
+
+# local office lock files
+*.~lock*
+nextflow/inputs/.~lock*
+
+# generated resources and outputs
+large_files/*.tsv.gz
+large_files/*.txt.gz
+large_files/*.txt
+large_files/*.txt.zip
+large_files/*.json
+large_files/*.obo
+large_files/*.db
+large_files/*.gz
+large_files/*.zip
+large_files/ref.fa
+large_files/gnomad_4.1_region_merged_GRCh38_whole_genome
+processed_annotations/
+
+# apptainer build artifacts and staged env payloads
+apptainer/assets/
+apptainer/build/
+*.sif
+
+# local full-workflow example and generated bundles
+trio_runs/
+local_examples/

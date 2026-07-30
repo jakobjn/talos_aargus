@@ -1,5 +1,4 @@
 process AnnotateClinvarWithBcftools {
-    container params.container
 
     input:
         tuple path(vcf), path(vcf_idx)

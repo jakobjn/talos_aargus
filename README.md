@@ -1,287 +1,342 @@
-# **Talos**
+# Talos Aargus
 
 [![Docs](https://img.shields.io/badge/docs-populationgenomics.github.io%2Ftalos-blue)](https://populationgenomics.github.io/talos/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 ![Test](https://github.com/populationgenomics/automated-interpretation-pipeline/actions/workflows/test.yaml/badge.svg)
 
-> 📖 **Full documentation:** <https://populationgenomics.github.io/talos/>
+This repository is an Aarhus University Hospital extension of the Talos workflow.
 
-## **Overview**
+It keeps the Talos v11 TSV-driven analysis model, but adds an AUH-oriented runtime
+and preflight layer:
 
-**Talos** is a scalable, open-source variant prioritisation tool designed to support automated reanalysis of genomic data in rare disease. It identifies **candidate causative variants in known disease genes** by integrating static annotations (e.g. population frequency, predicted consequence) with dynamic knowledge sources such as ClinVar and PanelApp Australia. Talos applies a set of configurable, rule-based logic modules aligned with ACMG/AMP criteria and prioritises variants consistent with expected mode of inheritance and, optionally, patient phenotype.
+- native-first execution without requiring Docker
+- optional Apptainer packaging
+- standalone `preflight/` workflow for singleton, duo, and trio VCF preparation
+- In-house resource wiring for common variants, variant artefacts, and splicing variants
 
+## Part 1. AUH Extended Pipeline
 
-While Talos can be used for one-off reanalysis of individual families or cohorts, its core design is optimised for **routine, cohort-scale reanalysis**. By comparing current annotations with prior results, Talos highlights **variants that have become reportable due to newly available evidence**—such as new gene–disease or variant–disease relationships—since the last analysis cycle. This enables timely identification of new diagnoses driven by emerging knowledge, while maintaining a low manual review burden.
+### Overview
 
-Talos is specifically intended to identify **variants in established disease genes that are likely to explain the participant’s condition**. It is not designed to detect novel candidate genes or to interpret variants of uncertain significance outside the context of existing clinical knowledge. This focus improves specificity and supports use in diagnostic and research reanalysis workflows.
+The AUH extension is intended to support:
 
-A full description of the method and its validation in large clinical and research cohorts is available in our publication in Nature Medicine:
+- local or cluster execution with explicit runtime paths
+- preflight preparation of family VCFs before Talos
+- Slurm-friendly bundle generation for full end-to-end runs
+- optional Apptainer execution with the tested Talos runtime baked into the image
 
-[**https://www.nature.com/articles/s41591-026-04477-5**](https://www.nature.com/articles/s41591-026-04477-5)
+The main components are:
 
----
+- `preparation.nf`
+  Creates processed Talos annotations such as ClinVar, PM5, PanelApp, and encoded annotation resources
+- `main.nf`
+  Runs annotation plus Talos prioritisation from a TSV input file
+- `talos_only.nf`
+  Runs Talos only on previously annotated inputs
+- `preflight/main.nf`
+  Standalone AUH preflight workflow for manifest-driven family preparation
 
-## **When to Use Talos**
+### Runtime Layout
 
+Expected local structure:
 
-Talos is designed to support **automated reanalysis of rare disease cohorts**, enabling identification of **candidate causative variants in known disease genes** based on the latest available evidence. It is best suited for scenarios where:
+- `large_files/`
+  Downloaded static reference resources
+- `processed_annotations/`
+  Prepared Talos annotation outputs from `preparation.nf`
+- `preflight/runtime/talos2_env/bin`
+  Optional repo-local runtime path used by the preflight layer
+- `../../../resources/`
+  Shared AUH sibling resource folder for common-dbSNP and SpliceAI
 
-- You are performing **routine reanalysis** of undiagnosed individuals (e.g. monthly or quarterly)
+### Install
 
-- You want to detect **variants that have become reportable** due to updates in gene–disease or variant–disease knowledge
-
-- You aim to **minimise the number of variants requiring manual review** optimising for specificity over-sensitivity
-
-- You are working with **exome or genome sequencing data** from previously analysed research or clinical cohorts
-
-- You need a scalable, reproducible pipeline for **family-based or cohort-scale analysis**
-
-
-Talos is **not currently designed** for:
-
-- Identifying **novel candidate disease genes** or gene discovery
-
-- Analysing **short tandem repeats (STRs), mosaic variants**, or variants outside standard clinical reporting regions
-
-    - Mitochondrial analysis has now been added to Talos, but is limited to ClinVar pathogenic variants only.
-
-> Support for some of these variant types may be added in future releases.
-
-Talos complements existing variant curation workflows by focusing on high-specificity identification of variants that are likely to explain a participant’s condition, based on established gene–disease associations and up-to-date variant-level evidence.
-
----
-
-## **🚀 Quick Start**
-
-Talos is implemented using **Nextflow**, with all dependencies containerised via Docker. The example workflows can be run locally or on a cluster.
-
-There are two primary workflows:
-
-* `preparation.nf`: downloads and formats data in preparation for Talos runs
-* `main.nf`: imports and executes the two sub-workflows which comprise the Talos runs
-
-### **1. Install Requirements**
+Requirements:
 
 - [Nextflow](https://www.nextflow.io/docs/latest/install.html)
+- Java
+- Python 3.10 or 3.11
+- `bcftools`, `tabix`, `bgzip`, `samtools`, `wget`
 
-- Docker
-
-To build the Docker image:
-
-```
-docker build -t talos:11.1.0 .
-```
-
-### **2. Download Annotation Resources**
-
-Talos requires several large external resources (e.g. reference genome, gnomAD, AlphaMissense, Phenotype data). These are expected in a `large_files` directory. See [large_files/README.md](large_files/README.md) for detail on where to obtain them, and a [script](large_files/gather_files.sh) which will handle the initial download of all required resources.
-
-### **3. Run Preparation Workflow**
-
-In addition to the downloaded raw resources, Talos requires two other annotation sources to be kept up to date:
-
-- ClinVar data, formatted into Hail Tables
-- PanelApp data, an up-to-date dump as JSON
-
-And a third data source (AlphaMissense) to be reformatted from the TSV into a Hail Table.
-
-A separate sub-workflow, `preparation.nf` handles the download and formatting of this data:
+For a shared conda-based setup:
 
 ```bash
-nextflow \
-    -c nextflow.config \
-    run preparation.nf \
-    [--processed_annotations <path>] \
-    [--large_files <path>]
+bash scripts/install_talos_env.sh
 ```
 
-The parameter `processed_annotations` should point to a static directory where talos-generated files can be stored, and any future run of Talos will be able to access them. i.e. data prepared and written here is not linked to any individual underlying cohort or callset.
+### Prepare Static Resources
 
-### **4. Run Annotation & Talos Combined Workflow**
-
-> **NEW IN 10.0.0**
-> Inputs for the Talos workflow are now provided in a single file, `--input_tsv`, instead of using several separate parameters.
-
-The inputs for the Talos workflow are:
-- **cohort**: a collective name to identify the input/results, used in output directory and file naming
-- **path**: path to the Cohort's input data (VCF)
-- **type**: type of the input data, see below
-- **pedigree**: path to a Pedigree for the cohort, See details [here](docs/Pedigree.md)
-- **config**: default available, path to the Talos config - see [example_config.toml](src/talos/example_config.toml) for an example, and the [Configuration README](docs/Configuration.md) for a full breakdown of all config parameters
-- **history**: optional, path to previous results
-- **ext_ids**: optional, path to ID mapping to present alternate IDs in the HTML report
-- **seqr_map**: optional, path to ID mapping to generate hyperlinks to Seqr in the HTML report
-- **mito**: optional, path to mitochondrial variants joint-called VCF
-
-The TSV file can contain any number of rows, each representing a distinct Cohort. A parallel Annotation & Talos run will be triggered for each input row, writing to a distinct output folder. An example TSV file has been provided to demonstrate.
-
-The [annotation workflow](nextflow/annotation.nf) pre-processes and annotates variants. This workflow only needs to be run once per dataset, with the resulting MatrixTable(s) re-used with each iterative analysis.
-
-#### Input Types 📂
-
-The input TSV uses two columns to locate variant input; `path` and `type`. `path` is the location of the input file or directory. `type` is one of 3 values, **vcf, shards, ss_vcf_dir**
-
-1. **vcf** a single multisample VCF. This will be split into shards and processed in parallel.
-2. **shards** a directory of pre-sharded multisample VCF fragments, each shard containing all samples.
-3. **ss_vcf_dir** single-sample VCFs, to be merged in the workflow, then sharded. These are detected using a glob, with the file extension controlled by `params.input_vcf_extension` (defaults to "vcf.bgz")
-
-All results from the workflow will be written to a path pattern `{workflow.outputDir}/{cohort}_outputs`. This argument should point to a directory outside this repository, though for demonstration purposes the default is `./nextflow`.
-
-The [main.nf](main.nf) workflow can be used to run both the main workflows, or where the data has been annotated previously, just the Talos workflow:
+Download the larger static resource set:
 
 ```bash
-nextflow \
-  -c nextflow.config \
-  run main.nf \
+bash large_files/gather_files.sh
+```
+
+On Slurm systems, a batch wrapper is also provided:
+
+```bash
+sbatch large_files/download_resources_slurm.sh
+```
+
+Then prepare Talos processed annotations:
+
+```bash
+nextflow -c nextflow.config run preparation.nf \
+  --processed_annotations processed_annotations \
+  --large_files large_files
+```
+
+### Workflow Smoke Test
+
+The repository includes a smoke-test TSV for the Talos v11 input model:
+
+```bash
+nextflow -c nextflow.config run main.nf \
   --input_tsv nextflow/inputs/test.tsv \
-  -output-dir <path_to_output_dir>
+  --processed_annotations processed_annotations \
+  -output-dir nextflow_output
 ```
 
->**For best results we advise repeating the Talos workflow on a regular cadence**
+If you want to test the Apptainer path instead:
+
 ```bash
-nextflow \
-  -c nextflow.config \
-  run talos_only.nf \
-  --input_tsv nextflow/inputs/test.tsv \
-  -output-dir <path_to_output_dir>
+bash build_apptainer_frontend.sh
+bash run_nextflow_example_apptainer.sh
 ```
 
----
+### Standalone Preflight
 
-## **🔬 Input Validation**
-The first step of the Talos workflow is a module called *StartupChecks*, which runs a number of input validations:
+The AUH preflight workflow is kept separate from Talos proper under [`preflight/`](preflight/).
 
-1. Checks a config file is present, and checks all required entries are present and have the correct type
-2. Opens the Matrix Table and checks the schema and data types
-3. Parses the Pedigree file and checks that it's well formatted and affected participants are present
-4. Checks the ClinVar data, ensuring it is recent and has sufficient entries
+It covers:
 
-This module will either run and complete, or run and fail, printing a collection of all encountered errors. If it fails, you will need to fix the errors before restarting the workflow.
+- direct manifest input
+- optional Excel-to-manifest mapping
+- single-sample VCF preparation
+- optional common-dbSNP subtraction
+- family merge
+- cohort merge
+- optional SpliceAI annotation
 
----
+Generic manifest-mode example:
 
-## **⚙️ Configuration**
-
-Talos as an application is configured through a single `TOML` file. This contains all thresholds and parameters for the steps of the Talos workflow. See [`example_config.toml`](src/talos/example_config.toml) as a baseline example, and [Configuration.md](docs/Configuration.md) for extended details on the role of each parameter, and its default value.
-
-Talos as a Nextflow workflow is configured through configuration files, one each for the [annotation](nextflow/annotation.config) and [talos](nextflow/talos.config) stages of the workflow. These configurations define the cohort name, paths to input and annotation resources, and runtime parameters. [NextflowConfiguration.md](docs/NextflowConfiguration.md) contains a full description of the default values and role in the analysis.
-
-## **📄 Outputs**
-
-Talos produces structured outputs to support both manual review and downstream integration.
-
-### **Primary Output:**
-
-- *.json file listing all candidate variants for each proband
-
-- Includes variant-level and gene-level evidence, inheritance checks, and phenotype match tags
-
-### **Optional Outputs:**
-
-- **HTML reports** summarising results for analysts or clinicians
-
-- **Simplified TSV** for Seqr ingestion via MinimiseOutputForSeqr
-
-### **Reanalysis Metadata:**
-
-- first_seen: when the variant was first returned
-
-- evidence_last_updated: when its evidence last changed
-
-Only variants passing configured thresholds and logic modules are returned.
-
----
-
-## **🔁 Reanalysis Mode**
-
-
-Talos is designed to support **automated, iterative reanalysis** of undiagnosed cohorts. To do this it reads the results of previous analyses, and integrates them into the latest report. This is currently done by reading in prior analysis results, and incorporating the previous observations with each run. To use this behaviour, use the config setting `params.previous_results`. See [History](docs/Reanalysis.md) for more information.
-
-### **How it works:**
-
-1. Run full annotation + prioritisation once
-
-2. In future cycles, keep ClinVar / PanelApp up to date **using the prep workflow**
-
-3. Rerun prioritisation to return **newly supported variants**
-
-By integrating the results of previous analyses with each new run, each variant in the output includes:
-
-- first_seen: original detection date
-
-- evidence_last_updated: last evidence update (ClinVar, PanelApp)
-
-> Talos maintains low review burden by allowing users to filter to only variants with newly actionable evidence in each analysis.
-
----
-
-## **🧬 Phenotype Matching**
-
-Talos supports phenotype-driven filtering using **HPO terms**. See [Pedigree.md](docs/Pedigree.md) for details on how to provide phenotype data in the pedigree file.
-
-### **Matching Strategies:**
-
-- **Patient-to-Gene**: semantic similarity between HPO terms and gene annotations
-
-- **Patient-to-Panel**: PanelApp panels assigned if patient terms match panel HPO tags
-
-- **Cohort-to-Panel**: manually assign panels to all individuals in config
-
-
-When provided, phenotype terms are used to:
-
-* Build a more accurate gene panel for each analysis, working with PanelApp to match disease-focused panels to HPO terms
-* Prioritise variants in the HTML by highlighting variants in genes which are on disease-specific panels, or where the participant and Gene HPO termsets share phenotypic similarities
-
----
-
-## **🧠 Variant Logic Modules**
-
-
-Talos prioritises variants using rule-based **logic modules**, each aligned with specific ACMG/AMP evidence criteria.
-
-
-### **Module Types**
-
-- **Primary**: sufficient to trigger reporting on their own (e.g. ClinVar_PLP)
-
-- **Supporting**: used only as second hits in recessive genes (e.g. AlphaMissense)
-
-
-### **Standard Modules**
-
-| **Module**          | **Description**                                                                                                                      |
-|---------------------|--------------------------------------------------------------------------------------------------------------------------------------|
-| ClinVar P/LP        | Pathogenic or Likely Pathogenic by ClinvArbitration                                                                                  |
-| ClinVar Recent Gene | P/LP in a PanelApp “new” gene (became Green within the recency window configured by `GeneratePanelData.within_x_months`, default 24) |
-| High Impact         | Predicted high-impact protein consequences                                                                                           |
-| De Novo             | Confirmed de novo in affected individual                                                                                             |
-| PM5                 | Missense in codon with known pathogenic variant                                                                                      |
-| LofSV               | Predicted loss-of-function structural variant                                                                                        |
-| ClinVar 0-star      | P/LP with 0 gold stars in ClinVar [Supporting category]                                                                              |
-| AlphaMissense       | AlphaMissense-predicted pathogenic missense variant  [Supporting category]                                                           |
-
-Each module can be configured through the `.toml` config file (see [Configuration.md](docs/Configuration.md))
-
----
-
-## **📓 Citation**
-
-
-If you use Talos in your research or clinical workflow, please cite:
-
-> Welland MJ, Ahlquist KD, De Fazio P, et al. _Scalable automated reanalysis of genomic data in research and clinical rare disease cohorts._ Nat Med (2026). https://doi.org/10.1038/s41591-026-04477-5
-
-
-BibTeX:
-
+```bash
+nextflow run preflight/main.nf \
+  -c preflight/nextflow.config \
+  -c preflight/local.config \
+  --sample_manifest preflight/examples/first_trio/sample_manifest.tsv \
+  --pedigree preflight/examples/first_trio/pedigree.ped \
+  -output-dir preflight/results
 ```
-@article{welland2026talos,
-  title     = {Scalable automated reanalysis of genomic data in research and clinical rare disease cohorts},
-  author    = {Welland, Matthew J and Ahlquist, KD and De Fazio, Paul and Austin-Tse, Christina and Pais, Lynn and Wedd, Laura and Bryen, Samantha and Rius, Rocio and Franklin, Michael and Hall, Giles and et al.},
-  journal   = {Nature Medicine},
-  year      = {2026},
-  doi       = {10.1038/s41591-026-04477-5},
-  url       = {https://doi.org/10.1038/s41591-026-04477-5},
-}
+
+Synthetic preflight smoke test:
+
+```bash
+bash preflight/example_preflight.sh
 ```
+
+Synthetic preflight plus Talos Apptainer smoke test:
+
+```bash
+bash preflight/example_with_talos_apptainer.sh
+```
+
+### Two-Family Direct Example
+
+The simplest direct layout for many samples is:
+
+- one `sample_manifest.tsv` with one row per single-sample VCF
+- one `pedigree.ped` with all families
+- one preflight run producing a merged cohort VCF
+- one Talos TSV row pointing at that merged cohort VCF
+
+Example `sample_manifest.tsv` for two trios:
+
+```tsv
+sample_id	vcf_path
+PROBAND_A	/data/vcfs/PROBAND_A.vcf.gz
+FATHER_A	/data/vcfs/FATHER_A.vcf.gz
+MOTHER_A	/data/vcfs/MOTHER_A.vcf.gz
+PROBAND_B	/data/vcfs/PROBAND_B.vcf.gz
+FATHER_B	/data/vcfs/FATHER_B.vcf.gz
+MOTHER_B	/data/vcfs/MOTHER_B.vcf.gz
+```
+
+Example `pedigree.ped`:
+
+```tsv
+FAM_A	PROBAND_A	FATHER_A	MOTHER_A	1	2
+FAM_A	FATHER_A	0	0	1	1
+FAM_A	MOTHER_A	0	0	2	1
+FAM_B	PROBAND_B	FATHER_B	MOTHER_B	2	2
+FAM_B	FATHER_B	0	0	1	1
+FAM_B	MOTHER_B	0	0	2	1
+```
+
+Native preflight:
+
+```bash
+export PATH=/path/to/talos2_env/bin:$PATH
+nextflow run preflight/main.nf \
+  -c preflight/nextflow.config \
+  -c preflight/local.config \
+  --sample_manifest /path/to/sample_manifest.tsv \
+  --pedigree /path/to/pedigree.ped \
+  -output-dir /path/to/preflight_results
+```
+
+Native Talos:
+
+```bash
+nextflow -c nextflow.config run main.nf \
+  --input_tsv /path/to/talos_input.tsv \
+  --processed_annotations /path/to/processed_annotations \
+  -output-dir /path/to/talos_outputs
+```
+
+Apptainer preflight:
+
+```bash
+apptainer exec \
+  --bind /path/to/repo:/path/to/repo \
+  --bind /path/to/data:/path/to/data \
+  --pwd /path/to/repo \
+  /path/to/talos-nextflow.sif \
+  nextflow run preflight/main.nf \
+    -c preflight/nextflow.config \
+    -c preflight/local.config \
+    --sample_manifest /path/to/sample_manifest.tsv \
+    --pedigree /path/to/pedigree.ped \
+    -output-dir /path/to/preflight_results
+```
+
+Apptainer Talos:
+
+```bash
+apptainer exec \
+  --bind /path/to/repo:/path/to/repo \
+  --bind /path/to/data:/path/to/data \
+  --pwd /path/to/repo \
+  /path/to/talos-nextflow.sif \
+  nextflow -c nextflow.config run main.nf \
+    --input_tsv /path/to/talos_input.tsv \
+    --processed_annotations /path/to/processed_annotations \
+    -output-dir /path/to/talos_outputs
+```
+
+For this AUH checkout, a local ignored runner script can also be created and run
+in-place for two real trios. It generates its own `sample_manifest.tsv`,
+`pedigree.ped`, `preflight.local.config`, and `talos_input.tsv` in the folder
+where the script lives.
+
+Local ignored example runners live under `local_examples/`, for example:
+
+```bash
+bash local_examples/run_single_trio_example.sh apptainer
+bash local_examples/run_two_trios_example.sh native
+```
+
+### Family Bundle Generator
+
+For real inputs, generate a timestamped ignored bundle with generic family roles:
+
+```bash
+bash preflight/create_family_bundle.sh \
+  --proband /path/to/PROBAND.vcf.gz \
+  --mother /path/to/MOTHER.vcf.gz \
+  --father /path/to/FATHER.vcf.gz
+```
+
+Fast smoke mode keeps only the first variant from each provided VCF:
+
+```bash
+bash preflight/create_family_bundle.sh \
+  --proband /path/to/PROBAND.vcf.gz \
+  --mother /path/to/MOTHER.vcf.gz \
+  --father /path/to/FATHER.vcf.gz \
+  --fast true
+```
+
+This creates a local ignored bundle under `trio_runs/` with:
+
+- `sample_manifest.tsv`
+- `pedigree.ped`
+- `preflight.local.config`
+- `run_full_slurm.sh`
+
+The generated script can be run either directly or through Slurm:
+
+```bash
+bash trio_runs/<bundle_name>/run_full_slurm.sh
+```
+
+```bash
+sbatch trio_runs/<bundle_name>/run_full_slurm.sh
+```
+
+### Apptainer Build
+
+The Apptainer tooling lives in [`apptainer/`](apptainer/).
+
+Typical flow:
+
+```bash
+bash apptainer/fetch_env_to_folder.sh
+bash apptainer/build_sif.sh
+```
+
+See [apptainer/README.md](apptainer/README.md) for details.
+
+### Output Summary
+
+Talos produces:
+
+- JSON results for each cohort
+- optional HTML reports
+- labelled VCF outputs
+- PanelApp cohort JSON
+- reanalysis metadata such as `first_seen` and `evidence_last_updated`
+
+The preflight layer produces:
+
+- `prepared_manifest.tsv`
+- family merge plan
+- cohort merged VCF
+- optional `cohort_merged_spliceai.vcf.gz`
+
+## Part 2. Original Talos Basis
+
+This repository is based on **Talos**, developed by the Population Genomics team.
+The AUH extension keeps the core Talos method and overall workflow structure while
+modifying runtime packaging, preflight handling, and local deployment patterns.
+
+Upstream Talos overview:
+
+- scalable variant prioritisation in known disease genes
+- ACMG/AMP-aligned rule-based logic modules
+- ClinVar and PanelApp-driven reanalysis support
+- cohort-scale reruns with prior-history tracking
+
+Primary upstream workflows:
+
+- `preparation.nf`
+- `main.nf`
+- `talos_only.nf`
+
+Primary upstream documentation:
+
+- <https://populationgenomics.github.io/talos/>
+- [docs/getting-started.md](docs/getting-started.md)
+- [docs/Configuration.md](docs/Configuration.md)
+- [docs/NextflowConfiguration.md](docs/NextflowConfiguration.md)
+
+### Acknowledgement
+
+This AUH fork builds on the original Talos project and its workflow design,
+documentation base, and variant prioritisation framework.
+
+If you use Talos in research or clinical work, cite the original publication:
+
+Welland MJ, Ahlquist KD, De Fazio P, et al. Scalable automated reanalysis of
+genomic data in research and clinical rare disease cohorts. *Nature Medicine*
+(2026). <https://doi.org/10.1038/s41591-026-04477-5>

@@ -4,6 +4,10 @@ nextflow.enable.dsl=2
 
 include { TALOS } from './nextflow/talos'
 
+def processedAnnotationPath(String name) {
+    return file("${params.processed_annotations}/${name}")
+}
+
 workflow {
 	main:
     if (file(workflow.outputDir).simpleName == file(params.processed_annotations).simpleName) {
@@ -16,7 +20,7 @@ workflow {
 		exit 1
 	}
 	ch_gff = channel.fromPath(params.ensembl_gff, checkIfExists: true).first()
-	ch_mane = channel.fromPath(params.mane_json, checkIfExists: true).first()
+	ch_mane = channel.fromPath(processedAnnotationPath('mane.json'), checkIfExists: true).first()
 	ch_ref_genome = channel.fromPath(params.ref_genome, checkIfExists: true).first()
 
 	/*
@@ -27,7 +31,7 @@ workflow {
 		.splitCsv(header: true, sep: '\t')
 		.map { row -> tuple(
 			row.cohort,
-			files("${workflow.outputDir}/${row.cohort}_outputs/*.mt", type: 'dir'),
+			files("${workflow.outputDir}/${row.cohort}_outputs/*_csq.vcf.bgz"),
 			file(row.pedigree, checkIfExists: true),
 			file(row.config, checkIfExists: true),
 			file(row.history ?: "${projectDir}/nextflow/assets/NO_HISTORY", checkIfExists: true),

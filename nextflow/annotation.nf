@@ -14,12 +14,14 @@ The specific annotations are:
 */
 
 include { AnnotateCsqWithBcftools } from './modules/annotation/AnnotateCsqWithBcftools/main'
-include { AnnotatedVcfIntoMatrixTable } from './modules/annotation/AnnotatedVcfIntoMatrixTable/main'
 include { AnnotateWithEchtvar } from './modules/annotation/AnnotateWithEchtvar/main'
 include { MergeVcfsWithBcftools } from './modules/annotation/MergeVcfsWithBcftools/main'
 include { NormaliseAndRegionFilterVcf } from './modules/annotation/NormaliseAndRegionFilterVcf/main'
 include { SplitVcf } from './modules/annotation/SplitVcf/main'
 
+def processedAnnotationPath(String name) {
+    return file("${params.processed_annotations}/${name}")
+}
 
 workflow ANNOTATION {
 	take:
@@ -30,19 +32,23 @@ workflow ANNOTATION {
 
     main:
     // populate various input channels - these are downloaded by the large_files/gather_files.sh script, or the prep wf
-    if (!file(params.alphamissense_zip).exists()) {
+    def alphamissense_zip = processedAnnotationPath('alphamissense.zip')
+    def ensembl_bed = processedAnnotationPath('GRCh38.bed')
+    def ensembl_merged_bed = processedAnnotationPath('GRCh38_merged.bed')
+
+    if (!alphamissense_zip.exists()) {
         println "AlphaMissense data must be encoded for echtvar, run the Talos Prep workflow (talos_preparation.nf)"
         exit 1
     }
-    ch_alphamissense_zip = channel.fromPath(params.alphamissense_zip, checkIfExists: true).first()
+    ch_alphamissense_zip = channel.fromPath(alphamissense_zip, checkIfExists: true).first()
 
     // check the ensembl BED file has been generated
-    if (!file(params.ensembl_bed).exists()) {
+    if (!ensembl_bed.exists()) {
         println "Region-Of-Interest BED file has not been prepared, run the Talos Prep workflow (talos_preparation.nf)"
         exit 1
     }
-    ch_bed = channel.fromPath(params.ensembl_bed, checkIfExists: true).first()
-    ch_merged_bed = channel.fromPath(params.ensembl_merged_bed, checkIfExists: true).first()
+    ch_bed = channel.fromPath(ensembl_bed, checkIfExists: true).first()
+    ch_merged_bed = channel.fromPath(ensembl_merged_bed, checkIfExists: true).first()
 
     ch_gnomad_zip = channel.fromPath(params.gnomad_zip, checkIfExists: true).first()
 
@@ -111,13 +117,6 @@ workflow ANNOTATION {
         ch_ref_genome,
     )
 
-    // reformat the annotations in the VCF, generate a Hail MatrixTable
-    AnnotatedVcfIntoMatrixTable(
-        AnnotateCsqWithBcftools.out,
-        ch_bed,
-        ch_mane,
-    )
-
     emit:
-    	mts = AnnotatedVcfIntoMatrixTable.out.groupTuple(by: 0)
+    	vcfs = AnnotateCsqWithBcftools.out.groupTuple(by: 0)
 }

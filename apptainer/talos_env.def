@@ -1,0 +1,84 @@
+Bootstrap: docker
+From: ubuntu:24.04
+
+%labels
+    Author talos
+    Application talos
+    Runtime talos2_env
+    EnvPrefix __TALOS_ENV_PREFIX__
+
+%files
+    ./assets/talos2_env.tar.gz /opt/talos-apptainer/assets/talos2_env.tar.gz
+    ./assets/talos2_env.manifest.txt /opt/talos-apptainer/assets/talos2_env.manifest.txt
+
+%post
+    set -eu
+
+    export DEBIAN_FRONTEND=noninteractive
+    mkdir -p /opt/talos-apptainer/assets
+    apt-get update
+    apt-get install -y --no-install-recommends \
+        bash \
+        ca-certificates \
+        coreutils \
+        curl \
+        findutils \
+        grep \
+        procps \
+        sed \
+        tar \
+        util-linux \
+        wget
+    rm -rf /var/lib/apt/lists/*
+
+    mkdir -p __TALOS_ENV_PARENT__
+    tar -xzf /opt/talos-apptainer/assets/talos2_env.tar.gz -C /
+
+    test -x __TALOS_ENV_PREFIX__/bin/python
+    test -x __TALOS_ENV_PREFIX__/bin/nextflow
+    test -x __TALOS_ENV_PREFIX__/bin/bcftools
+    test -x __TALOS_ENV_PREFIX__/bin/tabix
+    test -x __TALOS_ENV_PREFIX__/bin/bgzip
+    test -x __TALOS_ENV_PREFIX__/bin/echtvar
+
+    cp /opt/talos-apptainer/assets/talos2_env.manifest.txt /opt/talos-apptainer/talos2_env.manifest.txt
+
+%environment
+    export TALOS_ENV_PREFIX=__TALOS_ENV_PREFIX__
+    export PATH="${TALOS_ENV_PREFIX}/bin:${PATH}"
+    export JAVA_HOME="${TALOS_ENV_PREFIX}"
+    export NXF_JAVA_HOME="${TALOS_ENV_PREFIX}"
+    export LC_ALL=C.UTF-8
+    export LANG=C.UTF-8
+    export PYTHONNOUSERSITE=1
+
+%runscript
+    exec "$@"
+
+%test
+    set -eu
+    command -v python
+    command -v nextflow
+    command -v bcftools
+    command -v samtools
+    command -v tabix
+    command -v bgzip
+    command -v echtvar
+    python - <<'PY'
+import importlib
+for mod in [
+    "cyvcf2",
+    "pendulum",
+    "pydantic",
+    "httpx",
+    "networkx",
+    "obonet",
+    "tabulate",
+    "tenacity",
+    "toml",
+    "mendelbrot",
+    "clinvarbitration",
+]:
+    importlib.import_module(mod)
+print("apptainer python imports ok")
+PY

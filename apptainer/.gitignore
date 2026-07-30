@@ -1,0 +1,4 @@
+assets/*.tar.gz
+assets/*.sha256
+assets/*.manifest.txt
+build/

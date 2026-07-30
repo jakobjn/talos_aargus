@@ -2,7 +2,7 @@
 
 This guide walks you through preparing the environment, downloading the required reference data, and running your first Talos analysis.
 
-Talos is implemented using **Nextflow**, with all dependencies containerised via Docker. The example workflows can be run locally or on a cluster.
+Talos is implemented using **Nextflow** and is intended to run natively. Container execution is optional, but the default workflow path does not require Docker, Apptainer, or Singularity.
 
 There are two primary entry points:
 
@@ -20,13 +20,9 @@ And one secondary entrypoint:
 You will need:
 
 - [Nextflow](https://www.nextflow.io/docs/latest/install.html)
-- Docker (or a compatible container runtime)
-
-Build the Talos Docker image locally:
-
-```bash
-docker build -t talos:11.1.0 .
-```
+- Python 3.10 or 3.11 with Talos installed
+- Java
+- Native tools on `PATH`: `bcftools`, `tabix`, `bgzip`, `echtvar`, `wget`
 
 ---
 
@@ -42,9 +38,9 @@ See [`large_files/README.md`](https://github.com/populationgenomics/talos/blob/m
 
 In addition to the raw downloads, Talos requires the following annotation sources to be kept up to date:
 
-- **ClinVar** data, formatted into Hail Tables.
+- **ClinVar** data, reformatted into a monthly VCF plus PM5 TSV.
 - **PanelApp** data, dumped to JSON.
-- **AlphaMissense** data, reformatted from the source TSV into a Hail Table.
+- **AlphaMissense** data, reformatted from the source TSV into an echtvar archive.
 
 The `preparation.nf` sub-workflow handles all three:
 
@@ -67,7 +63,7 @@ The `processed_annotations` parameter should point to a static directory where T
 
 From version `10.0.0` onwards, all per-cohort inputs are provided in a single TSV file via `--input_tsv`. Each row in the TSV represents one cohort, and the workflow runs them in parallel into separate output directories.
 
-The optional columns (history, ext_ids, seqr_map, mito) can be omitted completely. If they are not provided, NextFlow defaults to a real but empty dummy file. See the provided example input file [here](https://github.com/populationgenomics/talos/blob/main/nextflow/inputs/test.tsv)
+The optional columns (history, ext_ids, seqr_map, mito) can be omitted completely. If they are not provided, NextFlow defaults to a real but empty dummy file. See the provided example input file [here](https://github.com/populationgenomics/talos/blob/main/nextflow/inputs/example.tsv)
 
 | Column     | Required | Description                                                                    |
 |:-----------|:---------|:-------------------------------------------------------------------------------|
@@ -107,11 +103,11 @@ This is not yet exposed in the nextflow implementation, but may be in future.
 nextflow \
     -c nextflow.config \
     run main.nf \
-    --input_tsv nextflow/inputs/test.tsv \
+    --input_tsv nextflow/inputs/example.tsv \
     -output-dir <path_to_output_dir>
 ```
 
-Results are written to `{workflow.outputDir}/{cohort}_outputs`. The annotation sub-workflow only needs to be run once per dataset — the resulting MatrixTables can be reused for every subsequent reanalysis cycle.
+Results are written to `{workflow.outputDir}/{cohort}_outputs`. The annotation sub-workflow only needs to be run once per dataset — the resulting annotated VCF shards can be reused for every subsequent reanalysis cycle.
 
 For subsequent cycles after the data has already been annotated, use the Talos-only entry point:
 
@@ -119,7 +115,7 @@ For subsequent cycles after the data has already been annotated, use the Talos-o
 nextflow \
     -c nextflow.config \
     run talos_only.nf \
-    --input_tsv nextflow/inputs/test.tsv \
+    --input_tsv nextflow/inputs/example.tsv \
     -output-dir <path_to_output_dir>
 ```
 
@@ -145,7 +141,7 @@ Each variant carries reanalysis metadata (`first_seen`, `evidence_last_updated`)
 The first step of every Talos run is a `StartupChecks` module that validates inputs before any analysis begins:
 
 1. Confirms a config file is present and that all required entries exist with the correct types.
-2. Opens the MatrixTable and checks the schema and data types.
+2. Opens the annotated VCF inputs and checks that required headers and fields are present.
 3. Parses the pedigree file, validating its format and that affected participants are present.
 4. Checks the ClinVar data, ensuring it is recent and has sufficient entries.
 

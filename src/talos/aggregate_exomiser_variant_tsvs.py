@@ -1,6 +1,8 @@
 """
-script for taking the per-proband Variant TSVs from Exomiser and aggregating them
-into a single JSON file, also written as a Hail Table
+Aggregate per-proband Exomiser variant TSVs into a single JSON file.
+
+Optional legacy support for emitting a Hail Table remains for older deployments,
+but this is not required by the default native Talos workflow.
 
 This in no way reimplements or runs Exomiser, and assumes you have already run Exomiser on your data.
 The expected data structure and excellent performance has been verified on version 14.0.0

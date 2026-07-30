@@ -1,6 +1,5 @@
 // not currently active, unsure if we want to pursue this
 process ConvertSpliceVarDb {
-    container params.container
 
     input:
         path(svdb)

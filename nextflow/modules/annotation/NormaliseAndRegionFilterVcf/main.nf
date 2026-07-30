@@ -1,5 +1,6 @@
 process NormaliseAndRegionFilterVcf {
-    container params.container
+    memory 1.GB
+    cpus 1
 
     // take the merged VCF and index
     // also take a BED file of regions to focus analysis on/filter VCF to

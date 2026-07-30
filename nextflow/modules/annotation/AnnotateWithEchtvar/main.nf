@@ -1,5 +1,6 @@
 process AnnotateWithEchtvar {
-    container params.container
+    memory 1.GB
+    cpus 1
 
     input:
         tuple val(cohort), path(vcf), path(tbi)

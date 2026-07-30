@@ -1,5 +1,4 @@
 process CreateTalosHTML {
-    container params.container
 
     input:
         tuple val(cohort), path(talos_result_json), path(panelapp_data), path(talos_config), path(ext_ids), path(seqr_ids)
@@ -16,6 +15,7 @@ process CreateTalosHTML {
         """
         set -euo pipefail
 
+        export PYTHONPATH="${projectDir}/src:\$PYTHONPATH"
         export TALOS_CONFIG=${talos_config}
         python -m talos.create_talos_html \
             --input ${talos_result_json} \

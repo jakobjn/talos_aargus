@@ -1,4 +1,8 @@
 """
+Legacy helper for pre-processing the SpliceVarDB TSV into a Hail table.
+
+This is not used by the default native Talos workflow.
+
 Script for pre-processing the SpliceVarDB tsv file into a Hail table
 
 SpliceVarDB: A comprehensive database of experimentally validated human splicing variants

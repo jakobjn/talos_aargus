@@ -1,4 +1,9 @@
 """
+Legacy Hail-based small-variant filtering path.
+
+The default public Talos workflow no longer uses this module. It is retained for
+older or internal deployments that still depend on Hail-backed inputs.
+
 Read, filter, annotate, classify, and write Genetic data
 - read MT
 - read PanelApp data through GCP client

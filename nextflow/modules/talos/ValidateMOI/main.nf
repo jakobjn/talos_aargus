@@ -1,5 +1,4 @@
 process ValidateMOI {
-    container params.container
 
     input:
         tuple val(cohort), path(labelled_vcf), path(labelled_vcf_index), path(mito), path(panelapp), path(pedigree), path(talos_config), path(previous_results)
@@ -16,6 +15,7 @@ process ValidateMOI {
         """
         set -euo pipefail
 
+        export PYTHONPATH="${projectDir}/src:\$PYTHONPATH"
         export TALOS_CONFIG=${talos_config}
 
         ${mito_idx}
