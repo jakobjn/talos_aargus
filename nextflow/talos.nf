@@ -70,8 +70,8 @@ workflow TALOS {
 
     UnifiedPanelAppParser(
         ch_panel_app_inputs,
-    	ch_panelapp,
-    	ch_hpo_file,
+	ch_panelapp,
+	ch_hpo_file,
     )
 
     ch_run_hail_inputs = ch_vcfs
@@ -165,8 +165,8 @@ workflow TALOS {
     )
 
     emit:
-    	json = HPOFlagging.out
-    	html = CreateTalosHTML.out
-    	labelled = RunHailFiltering.out
-    	panelapp = UnifiedPanelAppParser.out
+	json = HPOFlagging.out
+	html = CreateTalosHTML.out
+	labelled = RunHailFiltering.out
+	panelapp = UnifiedPanelAppParser.out
 }

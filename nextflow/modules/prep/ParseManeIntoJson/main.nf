@@ -1,7 +1,7 @@
 process ParseManeIntoJson {
 
     input:
-    	path mane_summary
+	path mane_summary
 
     output:
         path "mane.json"

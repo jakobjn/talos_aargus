@@ -17,12 +17,12 @@ process MergeVcfsWithBcftools {
         # -0 to set all missing genotypes to HomWT - gap-filling with Missing (default) reduces the AN, so callset
         # frequency filters can appear to show an inflated AC/AN ratio
         bcftools merge \
-        	--force-single \
-        	-m none \
-        	-0 \
-        	-Oz \
-        	--no-version \
-        	-o "${cohort}_merged.vcf.bgz" \
-        	$input
+	--force-single \
+	-m none \
+	-0 \
+	-Oz \
+	--no-version \
+	-o "${cohort}_merged.vcf.bgz" \
+	$input
         """
 }

@@ -11,7 +11,7 @@ process ResummariseRawSubmissions {
         tuple path("clinvarbitration_${timestamp}.vcf.bgz"), path("clinvarbitration_${timestamp}.vcf.bgz.tbi"), emit: "vcf"
 
     // Generates
-    // clinvarbitration_XX.vcf.bgz + index - VCF containing only pathogenic SNV entries, feeds into annotation
+    // clinvarbitration_XX.vcf.bgz + index - VCF containing pathogenic small-variant entries, feeds into annotation
     script:
         """
         set -euo pipefail

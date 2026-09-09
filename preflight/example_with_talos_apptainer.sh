@@ -28,9 +28,9 @@ mkdir -p "${PRELIGHT_WORK_ROOT}" "${PRELIGHT_RESULTS_DIR}" "${TALOS_OUTPUT_DIR}"
 
 bash "${BASE_DIR}/example_preflight_apptainer.sh"
 
-COHORT_VCF="${PRELIGHT_RESULTS_DIR}/cohort_merged_spliceai.vcf.gz"
+COHORT_VCF="${PRELIGHT_RESULTS_DIR}/cohort_merged.vcf.gz"
 if [[ ! -f "${COHORT_VCF}" ]]; then
-    COHORT_VCF="${PRELIGHT_RESULTS_DIR}/cohort_merged.vcf.gz"
+    COHORT_VCF="${PRELIGHT_RESULTS_DIR}/cohort_merged_spliceai.vcf.gz"
 fi
 
 PEDIGREE_PATH="${BASE_DIR}/examples/first_trio/pedigree.ped"

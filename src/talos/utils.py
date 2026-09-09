@@ -612,8 +612,10 @@ def create_small_variant(
         k: v for k, v in zip(samples, map(float, var.gt_alt_freqs), strict=True) if k in variant_samples
     }
 
-    # requires use of AB ratios and alt depths, may preclude the use of this variant if no categories remain
-    organise_de_novo(info, alt_depths, ab_ratios)
+    # In genotype-only de novo mode, match the v1 sparse-trio behaviour: do not
+    # prune de novo labels again here using child AB/alt-depth.
+    if not config_retrieve(['RunHailFiltering', 'de_novo', 'genotype_only'], False):
+        organise_de_novo(info, alt_depths, ab_ratios)
 
     # check for at least one remaining category after PM5/Exomiser/SVDB/DeNovo/other processing, else None
     # this isn't a sample-specific check, just a check that there's anything left worth classifying on

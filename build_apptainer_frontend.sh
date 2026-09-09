@@ -3,6 +3,7 @@
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+FIX_PERMISSIONS="${REPO_DIR}/scripts/fix_permissions.sh"
 
 export APPTAINER_TMPDIR="${SINGULARITY_TMPDIR:-/tmp}"
 export APPTAINER_CACHEDIR="${SINGULARITY_CACHEDIR:-$HOME/.apptainer/cache}"
@@ -15,6 +16,10 @@ echo "[INFO] APPTAINER_CACHEDIR=${APPTAINER_CACHEDIR}"
 
 bash apptainer/fetch_env_to_folder.sh
 bash apptainer/build_sif.sh
+
+if [[ -x "${FIX_PERMISSIONS}" ]]; then
+    bash "${FIX_PERMISSIONS}" "${REPO_DIR}/apptainer"
+fi
 
 echo "[INFO] Front-end Apptainer build finished"
 echo "[INFO] Example run: bash ./run_nextflow_example_apptainer.sh"

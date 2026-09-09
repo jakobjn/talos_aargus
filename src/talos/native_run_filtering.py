@@ -50,6 +50,7 @@ INFO_IDS = {
     'categorysampledenovo',
     'categorydetailspm5',
     'categorydetailsexomiser',
+    'splice_ai_delta',
     'gnomad_AC',
     'gnomad_AF',
     'gnomad_AC_XY',
@@ -71,6 +72,7 @@ INFO_HEADER_LINES = [
     ('categorysampledenovo', '1', 'String', 'Comma-delimited de novo sample IDs'),
     ('categorydetailspm5', '1', 'String', 'PM5 ClinVar allele details'),
     ('categorydetailsexomiser', '1', 'String', 'Exomiser details'),
+    ('splice_ai_delta', '1', 'Float', 'Maximum SpliceAI delta score'),
     ('gnomad_AC', '1', 'Integer', 'gnomAD allele count'),
     ('gnomad_AF', '1', 'Float', 'gnomAD allele frequency'),
     ('gnomad_AC_XY', '1', 'Integer', 'gnomAD XY allele count'),
@@ -143,11 +145,42 @@ def stringify_info(value: Any) -> str:
     return str(value)
 
 
+def normalise_clinvar_significance(value: Any) -> str:
+    return stringify_info(value).replace('_', ' ').strip()
+
+
+def is_clinvar_plp(value: Any) -> bool:
+    return normalise_clinvar_significance(value).lower() == PATHOGENIC.lower()
+
+
+def legacy_spliceai_delta(value: Any) -> float:
+    if value is None or value == '.':
+        return 0.0
+    entries = value if isinstance(value, (list, tuple)) else [value]
+    max_delta = 0.0
+    for entry in entries:
+        parts = str(entry).split('|')
+        if len(parts) < 6:
+            continue
+        max_delta = max(max_delta, *(normalise_float(score) for score in parts[2:6]))
+    return max_delta
+
+
+def spliceai_delta(variant) -> float:
+    delta = variant.INFO.get('splice_ai_delta')
+    if delta is not None:
+        return normalise_float(delta)
+    return legacy_spliceai_delta(variant.INFO.get('SpliceAI'))
+
+
 def parse_bcsq_entries(variant, bcsq_fields: list[str], gene_map: dict[str, dict[str, str]], mane: dict[str, dict[str, str]]):
     entries = variant.INFO.get('BCSQ')
     if not entries:
         return []
-    raw_entries = entries if isinstance(entries, list) else [entries]
+    raw_entries = []
+    entries_to_split = entries if isinstance(entries, list) else [entries]
+    for entry in entries_to_split:
+        raw_entries.extend(str(entry).split(','))
     transcripts: list[dict[str, Any]] = []
     for raw_entry in raw_entries:
         parts = str(raw_entry).split('|')
@@ -267,25 +300,32 @@ def get_genotype_type(variant, sample_idx: int) -> int:
     return int(variant.gt_types[sample_idx])
 
 
-def get_gq(variant, sample_idx: int) -> int:
+def get_gq(variant, sample_idx: int, default: int = 999) -> int:
     if 'GQ' not in variant.FORMAT:
-        return 999
+        return default
     value = variant.format('GQ')[sample_idx]
     if hasattr(value, '__len__'):
         value = value[0]
+    if value is None or value < 0:
+        return default
     return int(value)
 
 
-def get_dp(variant, sample_idx: int) -> int:
+def get_dp(variant, sample_idx: int, default: int = 999) -> int:
     if 'DP' in variant.FORMAT:
         value = variant.format('DP')[sample_idx]
         if hasattr(value, '__len__'):
             value = value[0]
+        if value is None or value < 0:
+            return default
         return int(value)
     if 'AD' in variant.FORMAT:
         values = variant.format('AD')[sample_idx]
-        return int(sum(v for v in values if v >= 0))
-    return 999
+        real_values = [v for v in values if v >= 0]
+        if not real_values:
+            return default
+        return int(sum(real_values))
+    return default
 
 
 def find_de_novo_samples(variant, pedigree: PedigreeParser, sample_index: dict[str, int]) -> list[str]:
@@ -294,6 +334,7 @@ def find_de_novo_samples(variant, pedigree: PedigreeParser, sample_index: dict[s
     max_depth = de_novo_config.get('max_depth', 1000)
     min_proband_gq = de_novo_config.get('min_proband_gq', 25)
     min_all_sample_gq = de_novo_config.get('min_all_sample_gq', 19)
+    apply_min_all_sample_gq = de_novo_config.get('apply_min_all_sample_gq', True)
     denovos: list[str] = []
     chrom = variant.CHROM.replace('chr', '')
     for participant in pedigree.participants.values():
@@ -309,11 +350,14 @@ def find_de_novo_samples(variant, pedigree: PedigreeParser, sample_index: dict[s
         child_gt = get_genotype_type(variant, child_idx)
         mother_gt = get_genotype_type(variant, mother_idx)
         father_gt = get_genotype_type(variant, father_idx)
-        if get_gq(variant, child_idx) < min_proband_gq:
+        if get_gq(variant, child_idx, default=0) < min_proband_gq:
             continue
-        if min(get_gq(variant, mother_idx), get_gq(variant, father_idx)) < min_all_sample_gq:
+        if apply_min_all_sample_gq and min(
+            get_gq(variant, mother_idx, default=min_all_sample_gq),
+            get_gq(variant, father_idx, default=min_all_sample_gq),
+        ) < min_all_sample_gq:
             continue
-        child_dp = get_dp(variant, child_idx)
+        child_dp = get_dp(variant, child_idx, default=min_depth + 1)
         if child_dp < min_depth or child_dp > max_depth:
             continue
         is_candidate = False
@@ -405,10 +449,10 @@ def classify_variants(
                 continue
 
             clinvar_info = annotate_clinvar_for_variant(variant, clinvar_reader)
-            significance = clinvar_info['clinvar_significance']
+            significance = normalise_clinvar_significance(clinvar_info['clinvar_significance'])
             if BENIGN in significance.lower() and clinvar_info['clinvar_stars'] > 0:
                 continue
-            clinvar_talos = int(significance == PATHOGENIC)
+            clinvar_talos = int(is_clinvar_plp(significance))
 
             ac = normalise_int(variant.INFO.get('AC'))
             af = normalise_float(variant.INFO.get('AF'))
@@ -421,6 +465,8 @@ def classify_variants(
                 continue
 
             denovo_samples = find_de_novo_samples(variant, pedigree, sample_index)
+            splice_delta = spliceai_delta(variant)
+            category_spliceai = int(spliceai_threshold is not None and splice_delta >= spliceai_threshold)
             for gene_id in sorted(gene_ids.intersection(green_genes)):
                 gene_txs = [
                     consequence
@@ -432,7 +478,7 @@ def classify_variants(
                     )
                 ]
                 filtered_txs = [consequence for consequence in gene_txs if consequence_is_relevant(consequence, allowed_terms)]
-                if not filtered_txs and clinvar_talos == 0:
+                if not filtered_txs and clinvar_talos == 0 and category_spliceai == 0:
                     continue
 
                 category_highimpact = int(any(consequence_is_high_impact(tx, critical_terms) for tx in filtered_txs))
@@ -441,11 +487,6 @@ def classify_variants(
                         isinstance(tx.get('am_pathogenicity'), float) and tx['am_pathogenicity'] >= am_threshold
                         for tx in filtered_txs
                     ),
-                )
-                category_spliceai = (
-                    int(normalise_float(variant.INFO.get('splice_ai_delta')) >= spliceai_threshold)
-                    if spliceai_threshold is not None and variant.INFO.get('splice_ai_delta') is not None
-                    else 0
                 )
                 category_avi = (
                     int(normalise_float(variant.INFO.get('avi_score')) >= avi_threshold)
@@ -500,6 +541,7 @@ def classify_variants(
                     'categorysampledenovo': ','.join(denovo_samples) if denovo_samples else MISSING_STRING,
                     'categorydetailspm5': '+'.join(pm5_entries) if pm5_entries else MISSING_STRING,
                     'categorydetailsexomiser': MISSING_STRING,
+                    'splice_ai_delta': splice_delta,
                     'gnomad_AC': normalise_int(variant.INFO.get('gnomad_AC_joint')),
                     'gnomad_AF': normalise_float(variant.INFO.get('gnomad_AF_joint')),
                     'gnomad_AC_XY': normalise_int(variant.INFO.get('gnomad_AC_joint_XY')),

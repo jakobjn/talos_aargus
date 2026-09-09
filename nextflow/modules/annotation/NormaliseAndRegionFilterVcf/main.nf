@@ -20,8 +20,8 @@ process NormaliseAndRegionFilterVcf {
     # multiple ways to reach this point, some do & some don't strictly index
     tabix ${vcf}
     bcftools norm \
-    	-m -any \
-    	-f ${ref_genome} \
+	-m -any \
+	-f ${ref_genome} \
         -R ${bed_file} \
         -Ou ${vcf} \
         --no-version | \

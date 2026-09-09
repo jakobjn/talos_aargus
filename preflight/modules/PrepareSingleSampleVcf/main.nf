@@ -12,11 +12,11 @@ process PREPARE_SINGLE_SAMPLE_VCF {
     """
     set -euo pipefail
 
-    bcftools view -Ou "${vcf}" \
-      | bcftools annotate -x FORMAT/AF,FORMAT/VAF,FORMAT/VAF1 \
-      | bcftools view -Oz -o "${sample_id}.vcf.gz"
-
-    bcftools index -t -f "${sample_id}.vcf.gz"
+    bcftools annotate \
+      -x FORMAT/AF,FORMAT/VAF,FORMAT/VAF1 \
+      -Oz \
+      --write-index=tbi \
+      -o "${sample_id}.vcf.gz" \
+      "${vcf}"
     """
 }
-

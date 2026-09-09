@@ -202,9 +202,7 @@ def write_vcf(rows: list[dict], output_vcf: str, pm5_filter: bool = True) -> Non
     for row in rows:
         ref, alt = row['alleles']
         if pm5_filter and not (
-            len(ref) == 1
-            and len(alt) == 1
-            and row['clinical_significance'] == Consequence.PATHOGENIC.value
+            row['clinical_significance'] == Consequence.PATHOGENIC.value
             and row['contig'] != 'chrM'
         ):
             continue

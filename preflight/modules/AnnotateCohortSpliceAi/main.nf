@@ -7,7 +7,7 @@ process ANNOTATE_COHORT_SPLICEAI {
     path spliceai_vcf
 
     output:
-    tuple path('cohort_merged_spliceai.vcf.gz'), path('cohort_merged_spliceai.vcf.gz.tbi'), emit: vcf
+    tuple path('cohort_merged.vcf.gz'), path('cohort_merged.vcf.gz.tbi'), emit: vcf
 
     script:
     """
@@ -20,9 +20,9 @@ process ANNOTATE_COHORT_SPLICEAI {
     bcftools annotate \
       -a "${spliceai_vcf}" \
       -c INFO/SpliceAI \
-      -Oz -o cohort_merged_spliceai.vcf.gz \
+      -Oz -o cohort_merged.vcf.gz \
       "${cohort_vcf}"
 
-    bcftools index -t -f cohort_merged_spliceai.vcf.gz
+    bcftools index -t -f cohort_merged.vcf.gz
     """
 }

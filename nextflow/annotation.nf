@@ -15,12 +15,17 @@ The specific annotations are:
 
 include { AnnotateCsqWithBcftools } from './modules/annotation/AnnotateCsqWithBcftools/main'
 include { AnnotateWithEchtvar } from './modules/annotation/AnnotateWithEchtvar/main'
+include { AnnotateWithSpliceAi } from './modules/annotation/AnnotateWithSpliceAi/main'
 include { MergeVcfsWithBcftools } from './modules/annotation/MergeVcfsWithBcftools/main'
 include { NormaliseAndRegionFilterVcf } from './modules/annotation/NormaliseAndRegionFilterVcf/main'
 include { SplitVcf } from './modules/annotation/SplitVcf/main'
 
 def processedAnnotationPath(String name) {
     return file("${params.processed_annotations}/${name}")
+}
+
+def paramEnabled(value) {
+    return value instanceof Boolean ? value : value?.toString()?.toBoolean()
 }
 
 workflow ANNOTATION {
@@ -117,6 +122,29 @@ workflow ANNOTATION {
         ch_ref_genome,
     )
 
+    ch_annotated_vcfs = AnnotateCsqWithBcftools.out
+
+    if (paramEnabled(params.spliceai_enabled)) {
+        if (!params.spliceai_vcf) {
+            println '--spliceai_vcf is required when --spliceai_enabled is true'
+            exit 1
+        }
+        def spliceai_vcf_idx = file("${params.spliceai_vcf}.tbi")
+        if (!spliceai_vcf_idx.exists()) {
+            spliceai_vcf_idx = file("${params.spliceai_vcf}.csi")
+        }
+        if (!spliceai_vcf_idx.exists()) {
+            println "Index not found for --spliceai_vcf: ${params.spliceai_vcf}.tbi or .csi"
+            exit 1
+        }
+        AnnotateWithSpliceAi(
+            ch_annotated_vcfs,
+            channel.fromPath(params.spliceai_vcf, checkIfExists: true).first(),
+            channel.fromPath(spliceai_vcf_idx, checkIfExists: true).first(),
+        )
+        ch_annotated_vcfs = AnnotateWithSpliceAi.out
+    }
+
     emit:
-    	vcfs = AnnotateCsqWithBcftools.out.groupTuple(by: 0)
+	vcfs = ch_annotated_vcfs.groupTuple(by: 0)
 }

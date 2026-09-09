@@ -45,6 +45,7 @@ This document explains the configuration options, the default values, and sensib
 | `min_alt_depth`      | If all other conditions succeed, at least this many Alt observations to confirm a de Novo call                                                                  | 5       |             |
 | `min_proband_gq`     | Minumum genotype quality score for all variants in probands/affected participants (detected via Pedigree)                                                       | 25      | 40          |
 | `min_all_sample_gq`  | Minimum GQ applied to all samples                                                                                                                               | 15      |             |
+| `genotype_only`      | When true, de novo detection is based on genotype state only for sparse trio VCFs. Native v2 also skips late `ValidateMOI` pruning by child AB/alt-depth in this mode. When false, `min_child_ab` and `min_alt_depth` are enforced as additional child evidence checks. | false   | true for sparse trio VCFs merged with missing-to-reference calls |
 
 ---
 

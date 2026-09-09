@@ -44,8 +44,9 @@ Expected local structure:
   Downloaded static reference resources
 - `processed_annotations/`
   Prepared Talos annotation outputs from `preparation.nf`
-- `preflight/runtime/talos2_env/bin`
-  Optional repo-local runtime path used by the preflight layer
+- `/faststorage/project/reanalyses_auh/env/talos2_env/bin`
+  Shared AUH runtime path used by the preflight layer and local example scripts,
+  including `nextflow`
 - `../../../resources/`
   Shared AUH sibling resource folder for common-dbSNP and SpliceAI
 

@@ -12,7 +12,7 @@ from pathlib import Path
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--samplelist", required=True, type=Path)
-    parser.add_argument("--department", default="KGA")
+    parser.add_argument("--department", default="DEPT")
     parser.add_argument("--manifest-output", required=True, type=Path)
     parser.add_argument("--pedigree-output", required=True, type=Path)
     parser.add_argument("--report-output", required=True, type=Path)
@@ -147,4 +147,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

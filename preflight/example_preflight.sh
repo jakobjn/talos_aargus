@@ -4,8 +4,9 @@ set -euo pipefail
 
 BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_DIR="$(cd "${BASE_DIR}/.." && pwd -P)"
+AUH_ROOT="$(cd "${REPO_DIR}/../.." && pwd -P)"
 
-RUNTIME_BIN_DIR="${RUNTIME_BIN_DIR:-${BASE_DIR}/runtime/talos2_env/bin}"
+RUNTIME_BIN_DIR="${RUNTIME_BIN_DIR:-${AUH_ROOT}/env/talos2_env/bin}"
 NEXTFLOW_BIN="${NEXTFLOW_BIN:-${RUNTIME_BIN_DIR}/nextflow}"
 BCFTOOLS_BIN="${BCFTOOLS_BIN:-${RUNTIME_BIN_DIR}/bcftools}"
 WORK_ROOT="${WORK_ROOT:-/tmp/preflight_test_run}"

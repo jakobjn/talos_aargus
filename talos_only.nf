@@ -11,7 +11,7 @@ def processedAnnotationPath(String name) {
 workflow {
 	main:
     if (file(workflow.outputDir).simpleName == file(params.processed_annotations).simpleName) {
-    	println "Output Directory (${workflow.outputDir}) is probably not set correctly, use config or `-output-dir`"
+	println "Output Directory (${workflow.outputDir}) is probably not set correctly, use config or `-output-dir`"
 		exit 1
     }
 
@@ -48,7 +48,7 @@ workflow {
 	)
 
 	publish:
-    	html = TALOS.out.html
+	html = TALOS.out.html
 		json = TALOS.out.json
 		panelapp = TALOS.out.panelapp
 }

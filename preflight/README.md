@@ -10,10 +10,14 @@ The pipeline is manifest-driven and keeps the old preflight stages separate:
 
 1. optional `samplelist.xlsx` mapping into a manifest and pedigree
 2. single-sample VCF preparation
-3. optional exact common-dbSNP subtraction
-4. pedigree-driven family merging
-5. cohort merge
-6. optional SpliceAI annotation
+3. optional pedigree-driven family merging
+4. cohort merge
+5. optional exact common-dbSNP subtraction
+6. optional legacy SpliceAI annotation
+
+Preflight SpliceAI annotation is off by default. The preferred location for
+precomputed SpliceAI lookup is now the main Talos annotation workflow, where it
+is applied after core annotation and before Talos filtering.
 
 ## What changed from the Bash draft
 
@@ -22,6 +26,8 @@ The pipeline is manifest-driven and keeps the old preflight stages separate:
 - no mandatory `VCF_symlinks` directory
 - no required `individual_vcfs_raw` and `individual_vcfs` dual output trees
 - no mandatory archive copy of the pre-SpliceAI cohort VCF
+- preflight SpliceAI lookup is disabled by default; the main Talos annotation
+  workflow is the preferred lookup point
 
 The main persistent checkpoint between stages is the prepared manifest:
 
@@ -49,7 +55,7 @@ nextflow run preflight/main.nf \
   -c preflight/nextflow.config \
   -c preflight/local.config \
   --samplelist_xlsx /path/to/samplelist.xlsx \
-  --department KGA \
+  --department DEPT \
   -output-dir preflight/results
 ```
 
@@ -70,13 +76,13 @@ placeholder VCF paths with real files before running.
 
 ## Local runtime config
 
-The standalone preflight workflow can use a local runtime staged under
-`preflight/runtime/`.
+The standalone preflight workflow can use a shared AUH runtime under
+`/faststorage/project/reanalyses_auh/env/talos2_env/`.
 
 `preflight/local.config` currently points to:
 
 ```groovy
-params.runtime_bin_dir = "${projectDir}/runtime/talos2_env/bin"
+params.runtime_bin_dir = "/faststorage/project/reanalyses_auh/env/talos2_env/bin"
 ```
 
 That keeps runtime lookup explicit without requiring shell activation. The older
@@ -92,12 +98,19 @@ Common dbSNP subtraction:
 --common_dbsnp_vcf /path/to/common_resource.vcf.gz
 ```
 
+When enabled, common-dbSNP subtraction runs once on the merged cohort VCF,
+before optional SpliceAI annotation. This keeps common variants out of the
+expensive annotation step without one indexed-resource scan per sample.
+
 SpliceAI annotation:
 
 ```bash
 --spliceai_enabled true
 --spliceai_vcf /path/to/spliceai_resource.vcf.gz
 ```
+
+The final cohort VCF is published with the stable name `cohort_merged.vcf.gz`
+whether this optional preflight SpliceAI step is enabled or disabled.
 
 The local config in this AUH checkout is wired to a shared sibling resource
 folder:
@@ -158,7 +171,18 @@ sbatch trio_runs/<bundle_name>/run_full_slurm.sh
 
 ## Family VCF publishing
 
-Family VCFs are kept as internal workflow intermediates either way.
+Family merging is disabled by default. Prepared individual VCFs are merged
+directly into the cohort VCF with `--missing-to-ref`; a parent without a record
+at a cohort locus is therefore still represented as `0/0` with missing
+depth/GQ, as in the family-merge path.
+
+Enable family merging when a per-proband family VCF is required:
+
+```bash
+--family_merge_enabled true
+```
+
+When enabled, family VCFs are internal workflow intermediates by default.
 
 By default they are not published into the visible output directory.
 
@@ -179,9 +203,8 @@ clear Nextflow `work/` directories or resume cache state.
 
 ## Example
 
-`preflight/examples/first_trio/` contains the first trio extracted from the
-current KGA pedigree as a concrete starting point. The manifest uses placeholder
-VCF paths and must be edited before running.
+`preflight/examples/first_trio/` contains a fully synthetic role-based trio.
+The manifest uses placeholder VCF paths and must be edited before running.
 
 Shell entrypoints:
 

@@ -63,7 +63,7 @@ The `processed_annotations` parameter should point to a static directory where T
 
 From version `10.0.0` onwards, all per-cohort inputs are provided in a single TSV file via `--input_tsv`. Each row in the TSV represents one cohort, and the workflow runs them in parallel into separate output directories.
 
-The optional columns (history, ext_ids, seqr_map, mito) can be omitted completely. If they are not provided, NextFlow defaults to a real but empty dummy file. See the provided example input file [here](https://github.com/populationgenomics/talos/blob/main/nextflow/inputs/example.tsv)
+The optional columns (history, ext_ids, seqr_map, mito) can be omitted completely. If they are not provided, NextFlow defaults to a real but empty dummy file. See the bundled input example in `nextflow/inputs/test.tsv`.
 
 | Column     | Required | Description                                                                    |
 |:-----------|:---------|:-------------------------------------------------------------------------------|
@@ -103,11 +103,30 @@ This is not yet exposed in the nextflow implementation, but may be in future.
 nextflow \
     -c nextflow.config \
     run main.nf \
-    --input_tsv nextflow/inputs/example.tsv \
+    --input_tsv nextflow/inputs/test.tsv \
     -output-dir <path_to_output_dir>
 ```
 
 Results are written to `{workflow.outputDir}/{cohort}_outputs`. The annotation sub-workflow only needs to be run once per dataset — the resulting annotated VCF shards can be reused for every subsequent reanalysis cycle.
+
+Precomputed SpliceAI annotation is enabled by default during this main
+annotation workflow. Supply the indexed SpliceAI resource VCF:
+
+```bash
+nextflow \
+    -c nextflow.config \
+    run main.nf \
+    --input_tsv nextflow/inputs/test.tsv \
+    --spliceai_enabled true \
+    --spliceai_vcf /path/to/spliceai.vcf.gz \
+    -output-dir <path_to_output_dir>
+```
+
+This is a lookup step using `bcftools annotate`; it does not compute SpliceAI
+scores de novo. The filtering threshold remains a Talos TOML setting.
+The preflight workflow can still do legacy SpliceAI lookup if explicitly
+enabled, but it is off by default and the main annotation workflow is preferred.
+Disable main-workflow SpliceAI explicitly with `--spliceai_enabled false`.
 
 For subsequent cycles after the data has already been annotated, use the Talos-only entry point:
 
@@ -115,7 +134,7 @@ For subsequent cycles after the data has already been annotated, use the Talos-o
 nextflow \
     -c nextflow.config \
     run talos_only.nf \
-    --input_tsv nextflow/inputs/example.tsv \
+    --input_tsv nextflow/inputs/test.tsv \
     -output-dir <path_to_output_dir>
 ```
 

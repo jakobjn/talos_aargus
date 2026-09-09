@@ -118,6 +118,7 @@ CLAUDE.md
 .cdx
 .cmd
 .codex
+/.git_broken_*/
 
 # local office lock files
 *.~lock*
@@ -135,6 +136,9 @@ large_files/*.gz
 large_files/*.zip
 large_files/ref.fa
 large_files/gnomad_4.1_region_merged_GRCh38_whole_genome
+large_files/*.fai
+large_files/*.out
+large_files/*.err
 processed_annotations/
 
 # apptainer build artifacts and staged env payloads
@@ -145,3 +149,5 @@ apptainer/build/
 # local full-workflow example and generated bundles
 trio_runs/
 local_examples/
+trio_example/
+talos_aargus_BU.tar

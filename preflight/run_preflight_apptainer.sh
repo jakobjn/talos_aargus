@@ -4,13 +4,15 @@ set -euo pipefail
 
 BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_DIR="$(cd "${BASE_DIR}/.." && pwd -P)"
+AUH_ROOT="$(cd "${REPO_DIR}/../.." && pwd -P)"
+FIX_PERMISSIONS="${REPO_DIR}/scripts/fix_permissions.sh"
 
 SIF_PATH="${SIF_PATH:-${REPO_DIR}/apptainer/build/talos-nextflow.sif}"
 OUTPUT_DIR="${OUTPUT_DIR:-${BASE_DIR}/results}"
 SAMPLE_MANIFEST="${SAMPLE_MANIFEST:-}"
 PEDIGREE="${PEDIGREE:-}"
 PREFLIGHT_CONFIG="${PREFLIGHT_CONFIG:-}"
-RUNTIME_BIN_DIR="${RUNTIME_BIN_DIR:-${REPO_DIR}/preflight/runtime/talos2_env/bin}"
+RUNTIME_BIN_DIR="${RUNTIME_BIN_DIR:-${AUH_ROOT}/env/talos2_env/bin}"
 COMMON_DBSNP_ENABLED="${COMMON_DBSNP_ENABLED:-false}"
 COMMON_DBSNP_VCF="${COMMON_DBSNP_VCF:-}"
 SPLICEAI_ENABLED="${SPLICEAI_ENABLED:-false}"
@@ -118,8 +120,12 @@ if [[ -n "${SPLICEAI_VCF}" ]]; then
     NF_ARGS+=(--spliceai_vcf "${SPLICEAI_VCF}")
 fi
 
-exec apptainer exec \
+apptainer exec \
     "${BIND_ARGS[@]}" \
     --pwd "${REPO_DIR}" \
     "${SIF_PATH}" \
     nextflow "${NF_ARGS[@]}"
+
+if [[ -x "${FIX_PERMISSIONS}" ]]; then
+    bash "${FIX_PERMISSIONS}" "${OUTPUT_DIR}"
+fi

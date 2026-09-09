@@ -1,0 +1,25 @@
+__pycache__/
+*.py[cod]
+.states
+*.db
+.web
+assets/external/
+data/
+reflex.lock/
+runs/
+uploaded_files/
+
+# Local runner state.
+.nextflow*/
+logs/
+runs/
+uploaded_files/
+
+# Generated synthetic-project artifacts. The raw source VCF and sample list are tracked.
+synthetic_one_proband_two_variants/inputs/
+synthetic_one_proband_two_variants/outputs/
+synthetic_one_proband_two_variants/work/
+synthetic_one_proband_two_variants/logs/
+synthetic_one_proband_two_variants/VCF_symlinks/
+synthetic_one_proband_two_variants/cohort_outputs/
+synthetic_one_proband_two_variants/.nextflow*/

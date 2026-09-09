@@ -16,8 +16,10 @@ EOF
 BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_DIR="$(cd "${BASE_DIR}/.." && pwd -P)"
 AUH_ROOT="$(cd "${REPO_DIR}/../.." && pwd -P)"
+FIX_PERMISSIONS="${REPO_DIR}/scripts/fix_permissions.sh"
 SHARED_RESOURCE_DIR="${SHARED_RESOURCE_DIR:-${AUH_ROOT}/resources}"
-RUNTIME_BIN_DIR="${RUNTIME_BIN_DIR:-${REPO_DIR}/preflight/runtime/talos2_env/bin}"
+SHARED_ENV_DIR="${SHARED_ENV_DIR:-${AUH_ROOT}/env/talos2_env}"
+RUNTIME_BIN_DIR="${RUNTIME_BIN_DIR:-${SHARED_ENV_DIR}/bin}"
 BCFTOOLS_BIN="${BCFTOOLS_BIN:-${RUNTIME_BIN_DIR}/bcftools}"
 COMMON_DBSNP_VCF="${COMMON_DBSNP_VCF:-${SHARED_RESOURCE_DIR}/20260518_common_resource.vcf.gz}"
 SPLICEAI_VCF="${SPLICEAI_VCF:-${SHARED_RESOURCE_DIR}/spliceai_scores_KGA_AUH_GRCh_38_Homo_sapiens_converted.vcf.gz}"
@@ -250,6 +252,7 @@ set -euo pipefail
 
 BASE_DIR="${BUNDLE_DIR}"
 REPO_DIR="${REPO_DIR}"
+FIX_PERMISSIONS="${FIX_PERMISSIONS}"
 
 SIF_PATH="\${SIF_PATH:-${SIF_PATH}}"
 PREFLIGHT_CONFIG="\${PREFLIGHT_CONFIG:-\${BASE_DIR}/preflight.local.config}"
@@ -276,9 +279,9 @@ OUTPUT_DIR="\${PREFLIGHT_OUTPUT_DIR}" \\
 SIF_PATH="\${SIF_PATH}" \\
 bash "\${REPO_DIR}/preflight/run_preflight_apptainer.sh"
 
-COHORT_VCF="\${PREFLIGHT_OUTPUT_DIR}/cohort_merged_spliceai.vcf.gz"
+COHORT_VCF="\${PREFLIGHT_OUTPUT_DIR}/cohort_merged.vcf.gz"
 if [[ ! -f "\${COHORT_VCF}" ]]; then
-    COHORT_VCF="\${PREFLIGHT_OUTPUT_DIR}/cohort_merged.vcf.gz"
+    COHORT_VCF="\${PREFLIGHT_OUTPUT_DIR}/cohort_merged_spliceai.vcf.gz"
 fi
 
 if [[ ! -f "\${COHORT_VCF}" ]]; then
@@ -294,7 +297,7 @@ EOI
 export APPTAINER_TMPDIR="\${SINGULARITY_TMPDIR:-/tmp}"
 export APPTAINER_CACHEDIR="\${SINGULARITY_CACHEDIR:-\$HOME/.apptainer/cache}"
 
-exec apptainer exec \\
+apptainer exec \\
     --bind "\${REPO_DIR}:\${REPO_DIR}" \\
     --bind "\${BASE_DIR}:\${BASE_DIR}" \\
     --pwd "\${REPO_DIR}" \\
@@ -304,6 +307,10 @@ exec apptainer exec \\
         --processed_annotations "\${PROCESSED_ANNOTATIONS_DIR}" \\
         -output-dir "\${TALOS_OUTPUT_DIR}" \\
         -resume
+
+if [[ -x "\${FIX_PERMISSIONS}" ]]; then
+    bash "\${FIX_PERMISSIONS}" "\${BASE_DIR}" "\${PREFLIGHT_OUTPUT_DIR}" "\${TALOS_OUTPUT_DIR}"
+fi
 EOF
 
 chmod +x "${BUNDLE_DIR}/run_full_slurm.sh"

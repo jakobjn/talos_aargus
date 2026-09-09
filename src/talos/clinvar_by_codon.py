@@ -11,7 +11,7 @@ except ModuleNotFoundError:
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
     logger = logging.getLogger(__name__)
 
-NUMBER_RE = re.compile(r'(\d+)\D>(\d+)\D?')
+NUMBER_RE = re.compile(r'(\d+)\D+>(\d+)\D*')
 TSV_KEYS = ['transcript', 'codon', 'clinvar_alleles']
 
 
@@ -22,9 +22,9 @@ def parse_tsv_into_dict(input_tsv: str) -> dict[str, set[str]]:
             tx, aa, aid, stars = row.rstrip().split('\t')
             match = NUMBER_RE.match(aa)
             if not match:
-                raise ValueError(f'No codon found in {aa}')
+                continue
             if match.group(1) != match.group(2):
-                raise ValueError(f'Codon numbers do not match in {aa}')
+                continue
             aa_number = match.group(1)
             clinvar_key = f'{aid}::{stars}'
             transcript_key = f'{tx}::{aa_number}'
